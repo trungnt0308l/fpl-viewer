@@ -246,7 +246,7 @@ const API = 'https://fantasy.premierleague.com/api';
 const PROXIES = [
   url => {
     const path = new URL(url).pathname;
-    return `https://fpl-proxy.tuantrung.workers.dev${path}`;
+    return `https://fpl-proxy.tuantrung.workers.dev/${path}`;
   },
 ];
 let proxyIndex = 0;
