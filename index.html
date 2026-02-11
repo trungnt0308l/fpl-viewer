@@ -7,6 +7,9 @@
 <meta name="description" content="See your Fantasy Premier League team for the next 5 gameweeks. Enter your FPL ID and share with friends.">
 <meta property="og:title" content="FPL Team Viewer">
 <meta property="og:description" content="Check your FPL squad for the next 5 gameweeks">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<!-- OG image is set dynamically via JS when squad loads -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
@@ -53,27 +56,39 @@
   .manager-bar{
     display:flex;align-items:center;justify-content:space-between;
     background:var(--surface);border:1px solid var(--border);border-radius:12px;
-    padding:14px 18px;margin-bottom:20px;flex-wrap:wrap;gap:8px
+    padding:14px 18px;margin-bottom:6px;flex-wrap:wrap;gap:8px
   }
   .manager-name{font-size:15px;font-weight:600;color:#fff}
   .manager-name span{color:var(--text2);font-weight:400;font-size:13px;margin-left:6px}
-  .manager-meta{font-size:13px;color:var(--text2);display:flex;gap:14px}
+  .manager-meta{font-size:13px;color:var(--text2);display:flex;gap:14px;flex-wrap:wrap}
   .manager-meta b{color:var(--accent);font-weight:600}
-  .share-btn{
+  .btn-group{display:flex;gap:6px}
+  .share-btn,.img-btn{
     background:var(--surface2);border:1px solid var(--border);border-radius:8px;
     padding:7px 14px;font-size:12px;color:var(--text2);cursor:pointer;
     font-family:inherit;transition:all .2s;display:flex;align-items:center;gap:5px
   }
-  .share-btn:hover{border-color:var(--accent);color:var(--accent)}
-  .share-btn svg{width:14px;height:14px}
+  .share-btn:hover,.img-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .share-btn svg,.img-btn svg{width:14px;height:14px}
+
+  /* Squad stats bar */
+  .stats-bar{
+    display:flex;gap:8px;margin-bottom:16px;overflow-x:auto;padding:2px 0
+  }
+  .stat-chip{
+    background:var(--surface);border:1px solid var(--border);border-radius:8px;
+    padding:6px 12px;font-size:11px;color:var(--text2);white-space:nowrap;
+    display:flex;align-items:center;gap:5px
+  }
+  .stat-chip b{color:var(--text);font-weight:600;font-size:12px}
+  .stat-chip .warn{color:#f87171}
+  .stat-chip .ok{color:#4ade80}
 
   /* ---- 5-column grid ---- */
   .gw-grid{
     display:grid;grid-template-columns:repeat(5,1fr);gap:10px;
     margin-bottom:20px
   }
-
-  /* Single GW column */
   .gw-col{
     background:var(--surface);border:1px solid var(--border);border-radius:12px;
     overflow:hidden;display:flex;flex-direction:column
@@ -84,14 +99,12 @@
   }
   .gw-header .gw-num{font-size:15px;font-weight:700;color:#fff}
   .gw-header .gw-deadline{font-size:10px;color:var(--text3);margin-top:2px}
-
   .gw-body{padding:10px 4px 12px;flex:1}
 
-  /* Position rows inside a column */
   .pos-section{display:flex;justify-content:center;gap:3px;flex-wrap:wrap;margin-bottom:8px}
   .pos-section:last-child{margin-bottom:0}
 
-  /* Player card — compact */
+  /* Player card */
   .player-card{
     width:56px;text-align:center;position:relative;margin-bottom:2px
   }
@@ -101,11 +114,7 @@
     position:relative;background:var(--surface3);
     box-shadow:0 2px 6px rgba(0,0,0,.3)
   }
-  .player-badge img{
-    width:28px;height:28px;object-fit:contain;
-    image-rendering:auto;border-radius:50%
-  }
-  /* Fallback colored circle when no logo */
+  .player-badge img{width:28px;height:28px;object-fit:contain;border-radius:50%}
   .player-badge.gk{background:linear-gradient(135deg,#d97706,#f59e0b)}
   .player-badge.def{background:linear-gradient(135deg,#2563eb,#3b82f6)}
   .player-badge.mid{background:linear-gradient(135deg,#16a34a,#22c55e)}
@@ -123,26 +132,28 @@
     background:var(--surface3);border:1.5px solid var(--captain);border-radius:50%;font-size:6px;font-weight:700;
     display:flex;align-items:center;justify-content:center;color:var(--captain);z-index:2
   }
+  /* Injury/doubt flag */
+  .status-dot{
+    position:absolute;bottom:-1px;left:-1px;width:10px;height:10px;
+    border-radius:50%;border:1.5px solid var(--surface);z-index:2;font-size:0
+  }
+  .status-dot.injured{background:#ef4444}
+  .status-dot.doubt{background:#f59e0b}
+  .status-dot.suspended{background:#ef4444}
 
-  /* Player name — high contrast white */
-  .player-name{
-    font-size:9px;font-weight:700;color:#ffffff;
-    line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
-  }
-  /* Fixture text — color-coded by difficulty */
-  .player-fixture{
-    font-size:8px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-    font-weight:600;letter-spacing:.2px
-  }
-  .fix-easy{color:#4ade80}   /* FDR 1-2: bright green */
-  .fix-mid{color:#fbbf24}    /* FDR 3: amber */
-  .fix-hard{color:#f87171}   /* FDR 4-5: red */
+  .player-name{font-size:9px;font-weight:700;color:#ffffff;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .player-fixture{font-size:8px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;letter-spacing:.2px}
+  .fix-easy{color:#4ade80}
+  .fix-mid{color:#fbbf24}
+  .fix-hard{color:#f87171}
   .fix-none{color:var(--text3)}
+  /* Form/xP line */
+  .player-stats{font-size:7px;color:var(--text3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .player-stats .hot{color:#4ade80}
+  .player-stats .cold{color:#f87171}
 
-  /* Bench divider */
-  .bench-divider{
-    height:1px;background:var(--border);margin:8px 0;position:relative
-  }
+  /* Bench */
+  .bench-divider{height:1px;background:var(--border);margin:8px 0;position:relative}
   .bench-divider::after{
     content:'BENCH';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
     background:var(--surface);padding:0 6px;font-size:7px;letter-spacing:1.5px;color:var(--text3);font-weight:600
@@ -151,43 +162,29 @@
 
   /* States */
   .loading{text-align:center;padding:60px 0}
-  .loading .spinner{
-    width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);
-    border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px
-  }
+  .loading .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}
   @keyframes spin{to{transform:rotate(360deg)}}
   .loading p{color:var(--text2);font-size:14px}
-  .error-msg{
-    background:#ef444415;border:1px solid #ef444430;border-radius:10px;
-    padding:14px 18px;color:#fca5a5;font-size:13px;text-align:center;margin-top:16px
-  }
+  .error-msg{background:#ef444415;border:1px solid #ef444430;border-radius:10px;padding:14px 18px;color:#fca5a5;font-size:13px;text-align:center;margin-top:16px}
   .empty-state{text-align:center;padding:60px 20px;color:var(--text3);font-size:14px;line-height:1.6}
   .empty-state .icon{font-size:40px;margin-bottom:12px;opacity:.4}
 
-  /* Ad placeholder */
-  .ad-slot{
-    background:var(--surface);border:1px dashed var(--border);border-radius:10px;
-    padding:16px;text-align:center;margin-top:24px;min-height:60px;
-    display:flex;align-items:center;justify-content:center
-  }
+  .ad-slot{background:var(--surface);border:1px dashed var(--border);border-radius:10px;padding:16px;text-align:center;margin-top:24px;min-height:60px;display:flex;align-items:center;justify-content:center}
   .ad-slot span{font-size:11px;color:var(--text3);letter-spacing:1px;text-transform:uppercase}
 
-  /* Toast */
-  .toast{
-    position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);
-    background:var(--surface2);border:1px solid var(--border);border-radius:10px;
-    padding:10px 20px;font-size:13px;color:var(--text);z-index:100;
-    transition:transform .3s ease;white-space:nowrap
-  }
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 20px;font-size:13px;color:var(--text);z-index:100;transition:transform .3s ease;white-space:nowrap}
   .toast.show{transform:translateX(-50%) translateY(0)}
 
-  /* Responsive — horizontal scroll on small screens */
+  /* Tooltip for injury news */
+  .player-card[data-news]:hover::after{
+    content:attr(data-news);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);
+    background:#1e293b;border:1px solid var(--border);border-radius:6px;padding:4px 8px;
+    font-size:9px;color:#fca5a5;white-space:nowrap;z-index:10;pointer-events:none;
+    max-width:160px;overflow:hidden;text-overflow:ellipsis
+  }
+
   @media(max-width:900px){
-    .gw-grid{
-      grid-template-columns:repeat(5,minmax(160px,1fr));
-      overflow-x:auto;-webkit-overflow-scrolling:touch;
-      scroll-snap-type:x mandatory;padding-bottom:8px
-    }
+    .gw-grid{grid-template-columns:repeat(5,minmax(160px,1fr));overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;padding-bottom:8px}
     .gw-col{scroll-snap-align:start;min-width:160px}
   }
   @media(max-width:480px){
@@ -200,16 +197,16 @@
     .player-badge img{width:24px;height:24px}
     .player-name{font-size:8px}
     .player-fixture{font-size:7px}
+    .player-stats{font-size:6px}
     .manager-bar{flex-direction:column;align-items:flex-start}
     .gw-grid{grid-template-columns:repeat(5,minmax(140px,1fr))}
     .gw-col{min-width:140px}
+    .stats-bar{gap:6px}
   }
 
-  /* Animations */
   @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
   .fade-in{animation:fadeIn .4s ease both}
-  .delay-1{animation-delay:.05s}.delay-2{animation-delay:.1s}.delay-3{animation-delay:.15s}
-  .delay-4{animation-delay:.2s}.delay-5{animation-delay:.25s}
+  .delay-1{animation-delay:.05s}.delay-2{animation-delay:.1s}
 </style>
 </head>
 <body>
@@ -262,10 +259,10 @@ let bootstrapData = null;
 let managerData = null;
 let picksData = {};
 let nextGWs = [];
+let historyData = null;
 
-// ---- Logo cache (blob URLs, persisted for the session) ----
+// ---- Logo cache ----
 const logoCache = {};
-
 async function getTeamLogoURL(teamCode) {
   if (logoCache[teamCode]) return logoCache[teamCode];
   const src = `https://resources.premierleague.com/premierleague/badges/t${teamCode}.png`;
@@ -275,18 +272,16 @@ async function getTeamLogoURL(teamCode) {
     const blob = await res.blob();
     logoCache[teamCode] = URL.createObjectURL(blob);
   } catch {
-    // Direct URL as fallback (may work without CORS for images)
     logoCache[teamCode] = src;
   }
   return logoCache[teamCode];
 }
-
 async function prefetchLogos() {
   if (!bootstrapData) return;
   await Promise.allSettled(bootstrapData.teams.map(t => getTeamLogoURL(t.code)));
 }
 
-// ---- Fetch with CORS proxy fallback ----
+// ---- Fetch ----
 async function apiFetch(url) {
   let lastErr;
   for (let i = 0; i < PROXIES.length; i++) {
@@ -302,11 +297,27 @@ async function apiFetch(url) {
   throw new Error(`All proxies failed. Last: ${lastErr?.message}`);
 }
 
+// ---- URL helpers: use ?id= query param (survives social sharing) ----
+function getIdFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  const qid = params.get('id');
+  if (qid) return qid.trim();
+  // Backward compat: also check hash
+  const hid = window.location.hash.replace('#','').trim();
+  return hid || '';
+}
+function setIdInURL(id) {
+  const url = new URL(window.location);
+  url.searchParams.set('id', id);
+  url.hash = ''; // remove old hash
+  history.replaceState(null, '', url);
+}
+
 // ---- Init ----
 document.addEventListener('DOMContentLoaded', () => {
-  const hashId = window.location.hash.replace('#','').trim();
+  const urlId = getIdFromURL();
   const savedId = localStorage.getItem('fpl_id');
-  const id = hashId || savedId;
+  const id = urlId || savedId;
   if (id) {
     document.getElementById('fplId').value = id;
     loadTeam();
@@ -326,7 +337,7 @@ async function loadTeam() {
   }
 
   localStorage.setItem('fpl_id', id);
-  history.replaceState(null, '', `#${id}`);
+  setIdInURL(id);
 
   const btn = document.getElementById('loadBtn');
   btn.disabled = true;
@@ -334,12 +345,12 @@ async function loadTeam() {
   showLoading();
 
   try {
-    // 1. Bootstrap data
+    // 1. Bootstrap
     if (!bootstrapData) {
-      bootstrapData = await apiFetch(`${API}/bootstrap-static/`);
+      bootstrapData = await apiFetch(`${API}/api/bootstrap-static/`);
     }
 
-    // 2. Start from NEXT GW (current one has already started)
+    // 2. Next GWs
     const events = bootstrapData.events;
     let startGW = events.find(e => e.is_next);
     if (!startGW) startGW = events.find(e => !e.finished) || events[events.length - 1];
@@ -348,18 +359,24 @@ async function loadTeam() {
     if (nextGWs.length === 0) nextGWs = [startGW];
 
     // 3. Manager info
-    managerData = await apiFetch(`${API}/entry/${id}/`);
+    managerData = await apiFetch(`${API}/api/entry/${id}/`);
 
-    // 4. Picks from latest completed GW
+    // 4. Manager history (for chips used, GW history)
+    historyData = await apiFetch(`${API}/api/entry/${id}/history/`);
+
+    // 5. Picks from latest completed GW
     const latestFinished = events.filter(e => e.finished).pop();
     const currentGW = events.find(e => e.is_current);
     const picksGW = latestFinished || currentGW || events[0];
-    picksData = await apiFetch(`${API}/entry/${id}/event/${picksGW.id}/picks/`);
+    picksData = await apiFetch(`${API}/api/entry/${id}/event/${picksGW.id}/picks/`);
 
-    // 5. Fixtures
-    bootstrapData._fixtures = await apiFetch(`${API}/fixtures/`);
+    // 6. Fixtures
+    bootstrapData._fixtures = await apiFetch(`${API}/api/fixtures/`);
 
-    // 6. Render immediately with fallback badges, then swap in logos
+    // 7. Update OG tags dynamically (helps some crawlers)
+    updateOGTags();
+
+    // 8. Render, then swap logos
     renderAll();
     prefetchLogos().then(() => renderAll());
 
@@ -372,32 +389,102 @@ async function loadTeam() {
   }
 }
 
-// ---- Render all 5 GWs side by side ----
+// ---- Update OG meta tags ----
+function updateOGTags() {
+  if (!managerData) return;
+  const name = `${managerData.player_first_name} ${managerData.player_last_name}`;
+  const pts = managerData.summary_overall_points || 0;
+  const rank = (managerData.summary_overall_rank || 0).toLocaleString();
+  setMeta('og:title', `${name}'s FPL Team`);
+  setMeta('og:description', `${managerData.name} • ${pts} pts • Rank ${rank} — Next 5 GW fixtures`);
+  document.title = `${name} — FPL Team Viewer`;
+}
+function setMeta(prop, content) {
+  let el = document.querySelector(`meta[property="${prop}"]`);
+  if (!el) { el = document.createElement('meta'); el.setAttribute('property', prop); document.head.appendChild(el); }
+  el.setAttribute('content', content);
+}
+
+// ---- Compute squad stats ----
+function getSquadStats() {
+  const picks = picksData.picks || [];
+  const players = bootstrapData.elements;
+  let totalValue = 0, totalPts = 0, injuredCount = 0, doubtCount = 0;
+  const squadPlayers = [];
+
+  picks.forEach(pick => {
+    const pl = players.find(p => p.id === pick.element);
+    if (!pl) return;
+    squadPlayers.push(pl);
+    totalValue += pl.now_cost;
+    totalPts += pl.total_points;
+    if (pl.status === 'i' || pl.status === 's') injuredCount++;
+    else if (pl.status === 'd') doubtCount++;
+  });
+
+  // Chips used
+  const chipsUsed = historyData?.chips?.map(c => c.name) || [];
+
+  // Bank
+  const lastGW = historyData?.current?.slice(-1)[0];
+  const bank = lastGW ? lastGW.bank : 0;
+
+  return { totalValue, totalPts, injuredCount, doubtCount, bank, chipsUsed, squadPlayers };
+}
+
+// ---- Render ----
 function renderAll() {
   const el = document.getElementById('content');
   el.innerHTML = '';
 
-  // Manager bar
   const m = managerData;
+  const stats = getSquadStats();
+
+  // Manager bar
   const bar = document.createElement('div');
   bar.className = 'manager-bar fade-in';
   bar.innerHTML = `
     <div>
       <div class="manager-name">${esc(m.player_first_name)} ${esc(m.player_last_name)}<span>${esc(m.name)}</span></div>
       <div class="manager-meta">
-        <span>Overall: <b>${(m.summary_overall_rank||0).toLocaleString()}</b></span>
+        <span>Rank: <b>${(m.summary_overall_rank||0).toLocaleString()}</b></span>
         <span>Points: <b>${m.summary_overall_points||0}</b></span>
       </div>
     </div>
-    <button class="share-btn" onclick="shareLink()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-      Share
-    </button>`;
+    <div class="btn-group">
+      <button class="img-btn" onclick="generateShareImage()" title="Download shareable image">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+        Image
+      </button>
+      <button class="share-btn" onclick="shareLink()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        Share
+      </button>
+    </div>`;
   el.appendChild(bar);
 
-  // 5-column grid
+  // Stats bar
+  const sb = document.createElement('div');
+  sb.className = 'stats-bar fade-in';
+  const tv = (stats.totalValue / 10).toFixed(1);
+  const bk = (stats.bank / 10).toFixed(1);
+  let chips = '';
+  if (stats.chipsUsed.length) chips = `<div class="stat-chip">Chips: <b>${stats.chipsUsed.map(c=>c.replace('_',' ')).join(', ')}</b></div>`;
+  let flagsHtml = '';
+  if (stats.injuredCount) flagsHtml += `<div class="stat-chip"><span class="warn">●</span> ${stats.injuredCount} injured/suspended</div>`;
+  if (stats.doubtCount) flagsHtml += `<div class="stat-chip"><span style="color:#f59e0b">●</span> ${stats.doubtCount} doubtful</div>`;
+  sb.innerHTML = `
+    <div class="stat-chip">Squad Value: <b>£${tv}m</b></div>
+    <div class="stat-chip">Bank: <b>£${bk}m</b></div>
+    <div class="stat-chip">Squad Pts: <b>${stats.totalPts}</b></div>
+    ${flagsHtml}${chips}
+  `;
+  el.appendChild(sb);
+
+  // Grid
   const grid = document.createElement('div');
   grid.className = 'gw-grid fade-in delay-1';
+  grid.id = 'gwGrid';
 
   const picks = picksData.picks || [];
   const players = bootstrapData.elements;
@@ -407,19 +494,12 @@ function renderAll() {
   nextGWs.forEach(gw => {
     const col = document.createElement('div');
     col.className = 'gw-col';
-
     const dl = gw.deadline_time ? new Date(gw.deadline_time) : null;
     const dlStr = dl ? dl.toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '';
-
-    // Header
-    col.innerHTML = `<div class="gw-header">
-      <div class="gw-num">GW${gw.id}</div>
-      <div class="gw-deadline">${dlStr}</div>
-    </div>`;
+    col.innerHTML = `<div class="gw-header"><div class="gw-num">GW${gw.id}</div><div class="gw-deadline">${dlStr}</div></div>`;
 
     const body = document.createElement('div');
     body.className = 'gw-body';
-
     const gwFix = fixtures.filter(f => f.event === gw.id);
     const starters = picks.filter(p => p.position <= 11);
     const bench = picks.filter(p => p.position > 11);
@@ -436,24 +516,20 @@ function renderAll() {
     posOrder.forEach(pos => {
       const sec = document.createElement('div');
       sec.className = 'pos-section';
-      grouped[pos].forEach(({pick,player}) => {
-        sec.innerHTML += renderCard(player, pick, gwFix, teams);
-      });
+      grouped[pos].forEach(({pick,player}) => { sec.innerHTML += renderCard(player, pick, gwFix, teams); });
       body.appendChild(sec);
     });
 
-    // Bench
-    const div = document.createElement('div');
-    div.className = 'bench-divider';
-    body.appendChild(div);
-    const br = document.createElement('div');
-    br.className = 'bench-row';
+    const divEl = document.createElement('div');
+    divEl.className = 'bench-divider';
+    body.appendChild(divEl);
+    const benchRow = document.createElement('div');
+    benchRow.className = 'bench-row';
     bench.forEach(pick => {
       const pl = players.find(p => p.id === pick.element);
-      if (pl) br.innerHTML += renderCard(pl, pick, gwFix, teams);
+      if (pl) benchRow.innerHTML += renderCard(pl, pick, gwFix, teams);
     });
-    body.appendChild(br);
-
+    body.appendChild(benchRow);
     col.appendChild(body);
     grid.appendChild(col);
   });
@@ -467,14 +543,13 @@ function renderCard(player, pick, gwFix, teams) {
   const teamCode = teamObj ? teamObj.code : 0;
   const posClass = {1:'gk',2:'def',3:'mid',4:'fwd'}[player.element_type] || 'mid';
 
-  // Logo
   const cached = logoCache[teamCode];
   const inner = cached
     ? `<img src="${cached}" alt="${esc(teamShort)}" loading="lazy">`
     : `<span class="fallback-text">${esc(teamShort)}</span>`;
   const badgeCls = cached ? '' : posClass;
 
-  // Fixture with difficulty color
+  // Fixture
   let fixHtml = '';
   const pf = gwFix.filter(f => f.team_h === player.team || f.team_a === player.team);
   pf.forEach(f => {
@@ -488,15 +563,181 @@ function renderCard(player, pick, gwFix, teams) {
   });
   if (!fixHtml) fixHtml = '<span class="fix-none">—</span>';
 
+  // Captain/VC
   let badge = '';
   if (pick.is_captain) badge = '<div class="captain-badge">C</div>';
   else if (pick.is_vice_captain) badge = '<div class="vice-badge">V</div>';
 
-  return `<div class="player-card">
-    <div class="player-badge ${badgeCls}">${inner}${badge}</div>
+  // Status dot (injury/doubt/suspended)
+  let statusDot = '';
+  if (player.status === 'i') statusDot = '<div class="status-dot injured" title="Injured"></div>';
+  else if (player.status === 'd') statusDot = '<div class="status-dot doubt" title="Doubtful"></div>';
+  else if (player.status === 's') statusDot = '<div class="status-dot suspended" title="Suspended"></div>';
+
+  // Form + expected points
+  const form = parseFloat(player.form) || 0;
+  const epNext = parseFloat(player.ep_next) || 0;
+  const formCls = form >= 6 ? 'hot' : form <= 2 ? 'cold' : '';
+  const formStr = `<span class="${formCls}">${form.toFixed(1)}</span>`;
+
+  // News tooltip
+  const newsAttr = player.news ? ` data-news="${esc(player.news)}"` : '';
+
+  return `<div class="player-card"${newsAttr}>
+    <div class="player-badge ${badgeCls}">${inner}${badge}${statusDot}</div>
     <div class="player-name" title="${esc(player.web_name)}">${esc(player.web_name)}</div>
     <div class="player-fixture">${fixHtml}</div>
+    <div class="player-stats">Form ${formStr} · xP ${epNext.toFixed(1)}</div>
   </div>`;
+}
+
+// ---- Generate shareable image via Canvas ----
+async function generateShareImage() {
+  const m = managerData;
+  const picks = picksData.picks || [];
+  const players = bootstrapData.elements;
+  const teams = bootstrapData.teams;
+  const fixtures = bootstrapData._fixtures || [];
+
+  const W = 1200, H = 630; // OG image standard size
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#0a0e17';
+  ctx.fillRect(0, 0, W, H);
+
+  // Header gradient bar
+  const grad = ctx.createLinearGradient(0, 0, W, 0);
+  grad.addColorStop(0, '#11998e');
+  grad.addColorStop(1, '#38ef7d');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, 4);
+
+  // Title
+  ctx.fillStyle = '#38ef7d';
+  ctx.font = '600 14px DM Sans, sans-serif';
+  ctx.fillText('⚽ FPL VIEWER', 40, 40);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '700 24px DM Sans, sans-serif';
+  ctx.fillText(`${m.player_first_name} ${m.player_last_name}`, 40, 72);
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '500 16px DM Sans, sans-serif';
+  ctx.fillText(`${m.name}  •  ${m.summary_overall_points} pts  •  Rank ${(m.summary_overall_rank||0).toLocaleString()}`, 40, 96);
+
+  // Columns
+  const colW = (W - 80 - 40) / Math.min(nextGWs.length, 5);
+  const startX = 40;
+  const startY = 130;
+
+  nextGWs.slice(0, 5).forEach((gw, gi) => {
+    const x = startX + gi * (colW + 10);
+
+    // Column bg
+    ctx.fillStyle = '#111827';
+    ctx.beginPath();
+    ctx.roundRect(x, startY, colW, H - startY - 30, 8);
+    ctx.fill();
+
+    // GW header
+    ctx.fillStyle = '#1a2332';
+    ctx.beginPath();
+    ctx.roundRect(x, startY, colW, 36, [8, 8, 0, 0]);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 14px DM Sans, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`GW${gw.id}`, x + colW/2, startY + 24);
+
+    // Players
+    const gwFix = fixtures.filter(f => f.event === gw.id);
+    const starters = picks.filter(p => p.position <= 11);
+    let py = startY + 50;
+    const posMap = {1:'GKP',2:'DEF',3:'MID',4:'FWD'};
+    const posOrder = ['GKP','DEF','MID','FWD'];
+    const grouped = {};
+    posOrder.forEach(p => grouped[p] = []);
+    starters.forEach(pick => {
+      const pl = players.find(p => p.id === pick.element);
+      if (pl) grouped[posMap[pl.element_type]||'MID'].push({pick,player:pl});
+    });
+
+    const posColors = {GKP:'#f59e0b',DEF:'#3b82f6',MID:'#22c55e',FWD:'#ef4444'};
+
+    posOrder.forEach(pos => {
+      const group = grouped[pos];
+      const rowW = group.length * 46;
+      const rowX = x + (colW - rowW) / 2;
+      group.forEach((item, pi) => {
+        const px = rowX + pi * 46;
+
+        // Small colored dot
+        ctx.fillStyle = posColors[pos];
+        ctx.beginPath();
+        ctx.arc(px + 23, py + 6, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Captain indicator
+        if (item.pick.is_captain) {
+          ctx.fillStyle = '#fbbf24';
+          ctx.beginPath();
+          ctx.arc(px + 30, py + 1, 4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#0a0e17';
+          ctx.font = '700 5px DM Sans, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('C', px + 30, py + 3);
+        }
+
+        // Name
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '600 8px DM Sans, sans-serif';
+        ctx.textAlign = 'center';
+        const displayName = item.player.web_name.length > 8 ? item.player.web_name.substring(0,7)+'…' : item.player.web_name;
+        ctx.fillText(displayName, px + 23, py + 20);
+
+        // Fixture
+        const pf = gwFix.filter(f => f.team_h === item.player.team || f.team_a === item.player.team);
+        if (pf.length) {
+          const f = pf[0];
+          const home = f.team_h === item.player.team;
+          const opp = teams.find(t => t.id === (home ? f.team_a : f.team_h));
+          const diff = home ? f.team_h_difficulty : f.team_a_difficulty;
+          ctx.fillStyle = diff <= 2 ? '#4ade80' : diff >= 4 ? '#f87171' : '#fbbf24';
+          ctx.font = '500 7px DM Sans, sans-serif';
+          ctx.fillText(`${opp?.short_name||'???'}${home?'(H)':'(a)'}`, px + 23, py + 29);
+        }
+      });
+      py += 38;
+    });
+  });
+
+  // Watermark
+  ctx.fillStyle = '#64748b';
+  ctx.font = '500 12px DM Sans, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(window.location.origin + '?id=' + managerData.id, W - 40, H - 16);
+
+  ctx.textAlign = 'start'; // reset
+
+  // Download
+  canvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    // Try native share with image on mobile
+    if (navigator.canShare && navigator.canShare({ files: [new File([blob], 'fpl-team.png', {type:'image/png'})] })) {
+      navigator.share({
+        title: `${m.player_first_name}'s FPL Team`,
+        files: [new File([blob], 'fpl-team.png', {type:'image/png'})],
+      });
+    } else {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fpl-team-${managerData.id}.png`;
+      a.click();
+      showToast('Image downloaded!');
+    }
+  }, 'image/png');
 }
 
 // ---- Helpers ----
