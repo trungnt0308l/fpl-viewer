@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FPL Team Viewer — Next 5 Gameweeks</title>
+<meta name="description" content="See your Fantasy Premier League team for the next 5 gameweeks. Enter your FPL ID and share with friends.">
+<meta property="og:title" content="FPL Team Viewer">
+<meta property="og:description" content="Check your FPL squad for the next 5 gameweeks">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0a0e17;--surface:#111827;--surface2:#1a2332;--surface3:#232f42;
+    --border:#2a3548;--text:#e8ecf4;--text2:#8895a7;--text3:#566176;
+    --accent:#38ef7d;--accent2:#11998e;--captain:#fbbf24;--bench:#64748b;
+    --danger:#ef4444;--gk:#f59e0b;--def:#3b82f6;--mid:#22c55e;--fwd:#ef4444;
+  }
+  html{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  body{min-height:100vh;padding:0 16px}
+
+  .container{max-width:720px;margin:0 auto;padding:40px 0 80px}
+  
+  /* Header */
+  .header{text-align:center;margin-bottom:36px}
+  .logo{font-size:13px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--accent);margin-bottom:8px;font-family:'JetBrains Mono',monospace}
+  .title{font-size:28px;font-weight:700;color:var(--text);line-height:1.2}
+  .subtitle{font-size:14px;color:var(--text2);margin-top:6px}
+
+  /* Input area */
+  .input-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:24px}
+  .input-row{display:flex;gap:10px}
+  .input-row input{
+    flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;
+    padding:12px 16px;font-size:15px;color:var(--text);font-family:inherit;
+    outline:none;transition:border .2s
+  }
+  .input-row input:focus{border-color:var(--accent)}
+  .input-row input::placeholder{color:var(--text3)}
+  .input-row button{
+    background:linear-gradient(135deg,var(--accent2),var(--accent));
+    border:none;border-radius:10px;padding:12px 24px;font-size:14px;
+    font-weight:600;color:#0a0e17;cursor:pointer;white-space:nowrap;
+    font-family:inherit;transition:opacity .2s
+  }
+  .input-row button:hover{opacity:.88}
+  .input-row button:disabled{opacity:.5;cursor:not-allowed}
+  .help-text{font-size:12px;color:var(--text3);margin-top:10px;line-height:1.5}
+  .help-text a{color:var(--accent);text-decoration:none}
+
+  /* Manager info */
+  .manager-bar{
+    display:flex;align-items:center;justify-content:space-between;
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    padding:14px 18px;margin-bottom:24px;flex-wrap:wrap;gap:8px
+  }
+  .manager-name{font-size:15px;font-weight:600}
+  .manager-name span{color:var(--text2);font-weight:400;font-size:13px;margin-left:6px}
+  .manager-meta{font-size:13px;color:var(--text2);display:flex;gap:14px}
+  .manager-meta b{color:var(--accent);font-weight:600}
+  .share-btn{
+    background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+    padding:7px 14px;font-size:12px;color:var(--text2);cursor:pointer;
+    font-family:inherit;transition:all .2s;display:flex;align-items:center;gap:5px
+  }
+  .share-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .share-btn svg{width:14px;height:14px}
+
+  /* Gameweek tabs */
+  .gw-tabs{display:flex;gap:6px;margin-bottom:20px;overflow-x:auto;padding-bottom:4px}
+  .gw-tab{
+    background:var(--surface);border:1px solid var(--border);border-radius:10px;
+    padding:10px 16px;font-size:13px;font-weight:500;color:var(--text2);
+    cursor:pointer;white-space:nowrap;transition:all .2s;flex:1;text-align:center;min-width:0
+  }
+  .gw-tab:hover{border-color:var(--text3)}
+  .gw-tab.active{background:linear-gradient(135deg,var(--accent2),var(--accent));color:#0a0e17;border-color:transparent;font-weight:700}
+  .gw-tab .gw-num{font-size:16px;font-weight:700;display:block;line-height:1.3}
+  .gw-tab .gw-deadline{font-size:10px;opacity:.7;display:block;margin-top:2px}
+
+  /* Pitch */
+  .pitch{
+    background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    padding:20px 12px;position:relative;overflow:hidden
+  }
+  .pitch::before{
+    content:'';position:absolute;inset:0;
+    background:
+      radial-gradient(ellipse 60% 8% at 50% 38%,rgba(56,239,125,.04),transparent),
+      linear-gradient(180deg,rgba(56,239,125,.02) 0%,transparent 100%);
+    pointer-events:none
+  }
+  .pitch-section{display:flex;justify-content:center;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+  .pitch-section:last-child{margin-bottom:0}
+  .pitch-label{
+    font-size:10px;text-transform:uppercase;letter-spacing:1.5px;
+    color:var(--text3);text-align:center;margin-bottom:8px;font-weight:600
+  }
+
+  .player-card{
+    width:72px;text-align:center;position:relative;transition:transform .15s
+  }
+  .player-card:hover{transform:translateY(-2px)}
+  .player-shirt{
+    width:40px;height:40px;border-radius:50%;margin:0 auto 4px;
+    display:flex;align-items:center;justify-content:center;font-size:11px;
+    font-weight:700;color:#fff;position:relative;
+    box-shadow:0 2px 8px rgba(0,0,0,.3)
+  }
+  .player-shirt.gk{background:linear-gradient(135deg,#d97706,#f59e0b)}
+  .player-shirt.def{background:linear-gradient(135deg,#2563eb,#3b82f6)}
+  .player-shirt.mid{background:linear-gradient(135deg,#16a34a,#22c55e)}
+  .player-shirt.fwd{background:linear-gradient(135deg,#dc2626,#ef4444)}
+  .captain-badge{
+    position:absolute;top:-3px;right:-3px;width:16px;height:16px;
+    background:var(--captain);border-radius:50%;font-size:8px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;color:#0a0e17;
+    box-shadow:0 1px 4px rgba(0,0,0,.3)
+  }
+  .vice-badge{
+    position:absolute;top:-3px;right:-3px;width:16px;height:16px;
+    background:var(--surface3);border:1.5px solid var(--captain);border-radius:50%;font-size:7px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;color:var(--captain)
+  }
+  .player-name{font-size:10px;font-weight:600;color:var(--text);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .player-fixture{font-size:9px;color:var(--text3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .player-fixture .home{color:var(--text2)}
+  .player-fixture .away{color:var(--text3)}
+
+  /* Bench */
+  .bench-divider{
+    height:1px;background:var(--border);margin:16px 0;position:relative
+  }
+  .bench-divider::after{
+    content:'BENCH';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    background:var(--surface);padding:0 12px;font-size:9px;letter-spacing:2px;color:var(--text3);font-weight:600
+  }
+  .bench-row{display:flex;justify-content:center;gap:6px;opacity:.6}
+
+  /* Fixture list */
+  .fixture-bar{
+    display:flex;align-items:center;gap:8px;background:var(--surface2);
+    border-radius:8px;padding:8px 12px;margin-top:4px;font-size:12px
+  }
+  .fixture-bar .vs{color:var(--text3);font-size:10px}
+  .fixture-bar .team-badge{font-weight:600;font-size:12px}
+  .fixture-bar .diff{
+    margin-left:auto;width:22px;height:22px;border-radius:6px;
+    display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700
+  }
+  .diff-1,.diff-2{background:#16a34a33;color:#22c55e}
+  .diff-3{background:#eab30833;color:#fbbf24}
+  .diff-4,.diff-5{background:#ef444433;color:#ef4444}
+
+  /* States */
+  .loading{text-align:center;padding:60px 0}
+  .loading .spinner{
+    width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);
+    border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading p{color:var(--text2);font-size:14px}
+  .error-msg{
+    background:#ef444415;border:1px solid #ef444430;border-radius:10px;
+    padding:14px 18px;color:#fca5a5;font-size:13px;text-align:center;margin-top:16px
+  }
+  .empty-state{text-align:center;padding:60px 20px;color:var(--text3);font-size:14px;line-height:1.6}
+  .empty-state .icon{font-size:40px;margin-bottom:12px;opacity:.4}
+
+  /* Ad placeholder */
+  .ad-slot{
+    background:var(--surface);border:1px dashed var(--border);border-radius:10px;
+    padding:16px;text-align:center;margin-top:24px;min-height:60px;
+    display:flex;align-items:center;justify-content:center
+  }
+  .ad-slot span{font-size:11px;color:var(--text3);letter-spacing:1px;text-transform:uppercase}
+
+  /* Toast */
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);
+    background:var(--surface2);border:1px solid var(--border);border-radius:10px;
+    padding:10px 20px;font-size:13px;color:var(--text);z-index:100;
+    transition:transform .3s ease;white-space:nowrap
+  }
+  .toast.show{transform:translateX(-50%) translateY(0)}
+
+  /* Responsive */
+  @media(max-width:480px){
+    .container{padding:24px 0 60px}
+    .title{font-size:22px}
+    .input-row{flex-direction:column}
+    .input-row button{padding:14px}
+    .player-card{width:60px}
+    .player-shirt{width:34px;height:34px;font-size:10px}
+    .gw-tab{padding:8px 10px}
+    .gw-tab .gw-num{font-size:14px}
+    .manager-bar{flex-direction:column;align-items:flex-start}
+  }
+
+  /* Animations */
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .fade-in{animation:fadeIn .4s ease both}
+  .delay-1{animation-delay:.05s}.delay-2{animation-delay:.1s}.delay-3{animation-delay:.15s}
+  .delay-4{animation-delay:.2s}.delay-5{animation-delay:.25s}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header class="header">
+    <div class="logo">⚽ FPL Viewer</div>
+    <h1 class="title">Your Team, Next 5 Gameweeks</h1>
+    <p class="subtitle">Enter your FPL ID to see your squad &amp; upcoming fixtures</p>
+  </header>
+
+  <div class="input-card">
+    <div class="input-row">
+      <input type="text" id="fplId" inputmode="numeric" pattern="[0-9]*" placeholder="Enter your FPL ID (e.g. 123456)" aria-label="FPL Team ID">
+      <button id="loadBtn" onclick="loadTeam()">View Team</button>
+    </div>
+    <p class="help-text">
+      Find your ID: go to <a href="https://fantasy.premierleague.com" target="_blank" rel="noopener">fantasy.premierleague.com</a> → 
+      Pick Team → View Gameweek history. Your ID is in the URL.
+    </p>
+  </div>
+
+  <div id="content">
+    <div class="empty-state">
+      <div class="icon">👕</div>
+      <p>Enter your FPL ID above to see your team<br>for the upcoming gameweeks.</p>
+    </div>
+  </div>
+
+  <div class="ad-slot">
+    <span>Ad Space</span>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ---- Config ----
+const API = 'https://fantasy.premierleague.com/api';
+// Free CORS proxies - we try multiple for resilience
+const PROXIES = [
+  url => {
+    const path = new URL(url).pathname;
+    return `https://fpl-proxy.tuantrung.workers.dev${path}`;
+  },
+];
+let proxyIndex = 0;
+
+// ---- State ----
+let bootstrapData = null;
+let managerData = null;
+let picksData = {};
+let currentGW = null;
+let nextGWs = [];
+let activeTab = 0;
+
+// ---- Fetch with CORS proxy fallback ----
+async function apiFetch(url) {
+  // Try each proxy until one works
+  let lastErr;
+  for (let i = 0; i < PROXIES.length; i++) {
+    const idx = (proxyIndex + i) % PROXIES.length;
+    try {
+      const res = await fetch(PROXIES[idx](url), { signal: AbortSignal.timeout(12000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      proxyIndex = idx; // remember working proxy
+      return data;
+    } catch(e) { lastErr = e; }
+  }
+  throw new Error(`All proxies failed. Last: ${lastErr?.message}`);
+}
+
+// ---- Init ----
+document.addEventListener('DOMContentLoaded', () => {
+  // Check URL hash first, then localStorage
+  const hashId = window.location.hash.replace('#','').trim();
+  const savedId = localStorage.getItem('fpl_id');
+  const id = hashId || savedId;
+  
+  if (id) {
+    document.getElementById('fplId').value = id;
+    loadTeam();
+  }
+
+  // Enter key
+  document.getElementById('fplId').addEventListener('keydown', e => {
+    if (e.key === 'Enter') loadTeam();
+  });
+});
+
+// ---- Load team ----
+async function loadTeam() {
+  const input = document.getElementById('fplId');
+  const id = input.value.trim();
+  if (!id || !/^\d+$/.test(id)) {
+    showError('Please enter a valid numeric FPL ID.');
+    return;
+  }
+
+  // Save & update URL
+  localStorage.setItem('fpl_id', id);
+  history.replaceState(null, '', `#${id}`);
+
+  const btn = document.getElementById('loadBtn');
+  btn.disabled = true;
+  btn.textContent = 'Loading…';
+  showLoading();
+
+  try {
+    // 1. Bootstrap data (players, teams, events)
+    if (!bootstrapData) {
+      bootstrapData = await apiFetch(`${API}/bootstrap-static/`);
+    }
+
+    // 2. Find current and next 5 GWs
+    const events = bootstrapData.events;
+    currentGW = events.find(e => e.is_current) || events.find(e => e.is_next) || events[events.length - 1];
+    const currentIdx = events.indexOf(currentGW);
+    // Use the most recent finished GW for picks, then show next 5
+    const startGW = currentGW.is_current ? currentGW : events[currentIdx > 0 ? currentIdx - 1 : 0];
+    nextGWs = events.slice(currentIdx, currentIdx + 5).filter(Boolean);
+    if (nextGWs.length === 0) nextGWs = [currentGW];
+
+    // 3. Manager info
+    managerData = await apiFetch(`${API}/entry/${id}/`);
+
+    // 4. Get picks for the latest available GW
+    const latestFinished = events.filter(e => e.finished).pop();
+    const picksGW = latestFinished || currentGW;
+    const picks = await apiFetch(`${API}/entry/${id}/event/${picksGW.id}/picks/`);
+    picksData = picks;
+
+    // 5. Get fixtures
+    const fixtures = await apiFetch(`${API}/fixtures/`);
+
+    // Store fixtures
+    bootstrapData._fixtures = fixtures;
+
+    // Render
+    activeTab = 0;
+    renderAll();
+  } catch(err) {
+    showError(`Failed to load team. ${err.message}. Check your FPL ID and try again.`);
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'View Team';
+  }
+}
+
+// ---- Render ----
+function renderAll() {
+  const el = document.getElementById('content');
+  el.innerHTML = '';
+
+  // Manager bar
+  const m = managerData;
+  const managerBar = document.createElement('div');
+  managerBar.className = 'manager-bar fade-in';
+  managerBar.innerHTML = `
+    <div>
+      <div class="manager-name">${esc(m.player_first_name)} ${esc(m.player_last_name)}<span>${esc(m.name)}</span></div>
+      <div class="manager-meta">
+        <span>Overall: <b>${(m.summary_overall_rank || 0).toLocaleString()}</b></span>
+        <span>Points: <b>${m.summary_overall_points || 0}</b></span>
+      </div>
+    </div>
+    <button class="share-btn" onclick="shareLink()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+      Share
+    </button>
+  `;
+  el.appendChild(managerBar);
+
+  // GW tabs
+  const tabs = document.createElement('div');
+  tabs.className = 'gw-tabs fade-in delay-1';
+  nextGWs.forEach((gw, i) => {
+    const tab = document.createElement('div');
+    tab.className = `gw-tab${i === activeTab ? ' active' : ''}`;
+    const dl = gw.deadline_time ? new Date(gw.deadline_time) : null;
+    const dlStr = dl ? dl.toLocaleDateString('en-GB', {day:'numeric',month:'short'}) : '';
+    tab.innerHTML = `<span class="gw-num">GW${gw.id}</span><span class="gw-deadline">${dlStr}</span>`;
+    tab.onclick = () => { activeTab = i; renderPitch(); };
+    tabs.appendChild(tab);
+  });
+  el.appendChild(tabs);
+
+  // Pitch container
+  const pitchWrap = document.createElement('div');
+  pitchWrap.id = 'pitchWrap';
+  el.appendChild(pitchWrap);
+
+  renderPitch();
+}
+
+function renderPitch() {
+  // Update tabs
+  document.querySelectorAll('.gw-tab').forEach((t,i) => t.classList.toggle('active', i === activeTab));
+
+  const wrap = document.getElementById('pitchWrap');
+  if (!wrap) return;
+
+  const picks = picksData.picks || [];
+  const players = bootstrapData.elements;
+  const teams = bootstrapData.teams;
+  const fixtures = bootstrapData._fixtures || [];
+  const gw = nextGWs[activeTab];
+
+  // Get fixtures for this GW
+  const gwFixtures = fixtures.filter(f => f.event === gw.id);
+
+  // Build player cards
+  const starters = picks.filter(p => p.position <= 11);
+  const bench = picks.filter(p => p.position > 11);
+
+  // Group starters by position
+  const posMap = {1:'GKP', 2:'DEF', 3:'MID', 4:'FWD'};
+  const posOrder = ['GKP','DEF','MID','FWD'];
+  const grouped = {};
+  posOrder.forEach(p => grouped[p] = []);
+
+  starters.forEach(pick => {
+    const pl = players.find(p => p.id === pick.element);
+    if (pl) {
+      const pos = posMap[pl.element_type] || 'MID';
+      grouped[pos].push({ pick, player: pl });
+    }
+  });
+
+  const benchPlayers = bench.map(pick => {
+    const pl = players.find(p => p.id === pick.element);
+    return { pick, player: pl };
+  }).filter(b => b.player);
+
+  // Render
+  let html = '<div class="pitch fade-in delay-2">';
+  posOrder.forEach(pos => {
+    const posLabel = {GKP:'Goalkeeper', DEF:'Defenders', MID:'Midfielders', FWD:'Forwards'}[pos];
+    html += `<div class="pitch-label">${posLabel}</div><div class="pitch-section">`;
+    grouped[pos].forEach(({pick, player}) => {
+      html += renderPlayerCard(player, pick, gwFixtures, teams);
+    });
+    html += '</div>';
+  });
+
+  // Bench
+  html += '<div class="bench-divider"></div>';
+  html += '<div class="bench-row">';
+  benchPlayers.forEach(({pick, player}) => {
+    html += renderPlayerCard(player, pick, gwFixtures, teams);
+  });
+  html += '</div>';
+  html += '</div>';
+
+  wrap.innerHTML = html;
+}
+
+function renderPlayerCard(player, pick, gwFixtures, teams) {
+  const posClass = {1:'gk',2:'def',3:'mid',4:'fwd'}[player.element_type] || 'mid';
+  const teamObj = teams.find(t => t.id === player.team);
+  const teamShort = teamObj ? teamObj.short_name : '???';
+
+  // Find fixture for this player's team in this GW
+  let fixtureStr = '';
+  const pFixtures = gwFixtures.filter(f => f.team_h === player.team || f.team_a === player.team);
+  pFixtures.forEach(f => {
+    const isHome = f.team_h === player.team;
+    const oppTeam = teams.find(t => t.id === (isHome ? f.team_a : f.team_h));
+    const oppName = oppTeam ? oppTeam.short_name : '???';
+    const diff = isHome ? f.team_h_difficulty : f.team_a_difficulty;
+    const loc = isHome ? '(H)' : '(A)';
+    const cls = isHome ? 'home' : 'away';
+    fixtureStr += `<span class="${cls}">${oppName} ${loc}</span> `;
+  });
+  if (!fixtureStr) fixtureStr = '<span class="away">—</span>';
+
+  let badge = '';
+  if (pick.is_captain) badge = '<div class="captain-badge">C</div>';
+  else if (pick.is_vice_captain) badge = '<div class="vice-badge">V</div>';
+
+  return `
+    <div class="player-card">
+      <div class="player-shirt ${posClass}">
+        ${teamShort}
+        ${badge}
+      </div>
+      <div class="player-name" title="${esc(player.web_name)}">${esc(player.web_name)}</div>
+      <div class="player-fixture">${fixtureStr}</div>
+    </div>
+  `;
+}
+
+// ---- Helpers ----
+function esc(s) { return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
+
+function showLoading() {
+  document.getElementById('content').innerHTML = `
+    <div class="loading"><div class="spinner"></div><p>Loading your team…</p></div>
+  `;
+}
+
+function showError(msg) {
+  const el = document.getElementById('content');
+  el.innerHTML = `<div class="error-msg">${esc(msg)}</div>`;
+}
+
+function shareLink() {
+  const url = window.location.href;
+  if (navigator.share) {
+    navigator.share({ title: 'My FPL Team', url });
+  } else {
+    navigator.clipboard.writeText(url).then(() => showToast('Link copied!')).catch(() => {});
+  }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+</script>
+
+</body>
+</html>
