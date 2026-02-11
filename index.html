@@ -122,15 +122,15 @@
   .player-badge .fallback-text{font-size:9px;font-weight:700;color:#fff}
 
   .captain-badge{
-    position:absolute;top:-2px;right:-2px;width:14px;height:14px;
-    background:var(--captain);border-radius:50%;font-size:7px;font-weight:700;
+    position:absolute;top:0;right:6px;width:15px;height:15px;
+    background:var(--captain);border-radius:50%;font-size:8px;font-weight:700;
     display:flex;align-items:center;justify-content:center;color:#0a0e17;
-    box-shadow:0 1px 3px rgba(0,0,0,.4);z-index:2
+    box-shadow:0 1px 3px rgba(0,0,0,.5);z-index:3
   }
   .vice-badge{
-    position:absolute;top:-2px;right:-2px;width:14px;height:14px;
-    background:var(--surface3);border:1.5px solid var(--captain);border-radius:50%;font-size:6px;font-weight:700;
-    display:flex;align-items:center;justify-content:center;color:var(--captain);z-index:2
+    position:absolute;top:0;right:6px;width:15px;height:15px;
+    background:var(--surface3);border:1.5px solid var(--captain);border-radius:50%;font-size:7px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;color:var(--captain);z-index:3
   }
   /* Injury/doubt flag */
   .status-dot{
@@ -358,10 +358,11 @@ async function loadTeam() {
     // 4. Manager history (for chips used, GW history)
     historyData = await apiFetch(`${API}/entry/${id}/history/`);
 
-    // 5. Picks from latest completed GW
-    const latestFinished = events.filter(e => e.finished).pop();
+    // 5. Picks — prefer current GW (has active captain/team selection)
+    //    then fall back to latest finished
     const currentGW = events.find(e => e.is_current);
-    const picksGW = latestFinished || currentGW || events[0];
+    const latestFinished = events.filter(e => e.finished).pop();
+    const picksGW = currentGW || latestFinished || events[0];
     picksData = await apiFetch(`${API}/entry/${id}/event/${picksGW.id}/picks/`);
 
     // 6. Fixtures
@@ -416,10 +417,9 @@ function getSquadStats() {
     else if (pl.status === 'd') doubtCount++;
   });
 
-  // Chips: calculate REMAINING from all available minus used
-  const allChips = ['wildcard','wildcard','freehit','bboost','3xc'];
+  // Chips: each manager starts with 2 WC, 2 FH, 2 BB, 2 TC
+  const allChips = ['wildcard','wildcard','freehit','freehit','bboost','bboost','3xc','3xc'];
   const usedChips = (historyData?.chips || []).map(c => c.name);
-  // Remove used from available (handle two wildcards correctly)
   const remaining = [...allChips];
   usedChips.forEach(used => {
     const idx = remaining.indexOf(used);
@@ -469,14 +469,14 @@ function renderAll() {
   sb.className = 'stats-bar fade-in';
   const tv = (stats.totalValue / 10).toFixed(1);
   const bk = (stats.bank / 10).toFixed(1);
-  let chips = '';
+  // Chips remaining display
   const chipNames = {wildcard:'WC',freehit:'FH',bboost:'BB','3xc':'TC'};
-  if (stats.chipsRemaining.length) {
-    const labels = stats.chipsRemaining.map(c => chipNames[c] || c);
-    chips = `<div class="stat-chip">Chips left: <b>${labels.join(', ')}</b></div>`;
-  } else {
-    chips = `<div class="stat-chip">Chips left: <b>None</b></div>`;
-  }
+  const chipCounts = {};
+  stats.chipsRemaining.forEach(c => { chipCounts[c] = (chipCounts[c]||0) + 1; });
+  const chipLabels = Object.entries(chipCounts).map(([k,v]) => `${chipNames[k]||k}×${v}`);
+  const chips = chipLabels.length
+    ? `<div class="stat-chip">Chips left: <b>${chipLabels.join(', ')}</b></div>`
+    : `<div class="stat-chip">Chips left: <b>None</b></div>`;
   let flagsHtml = '';
   if (stats.injuredCount) flagsHtml += `<div class="stat-chip"><span class="warn">●</span> ${stats.injuredCount} injured/suspended</div>`;
   if (stats.doubtCount) flagsHtml += `<div class="stat-chip"><span style="color:#f59e0b">●</span> ${stats.doubtCount} doubtful</div>`;
@@ -585,7 +585,8 @@ function renderCard(player, pick, gwFix, teams) {
   const newsAttr = player.news ? ` data-news="${esc(player.news)}"` : '';
 
   return `<div class="player-card"${newsAttr}>
-    <div class="player-badge ${badgeCls}">${inner}${badge}${statusDot}</div>
+    ${badge}
+    <div class="player-badge ${badgeCls}">${inner}${statusDot}</div>
     <div class="player-name" title="${esc(player.web_name)}">${esc(player.web_name)}</div>
     <div class="player-fixture">${fixHtml}</div>
   </div>`;
