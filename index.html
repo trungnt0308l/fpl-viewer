@@ -147,11 +147,6 @@
   .fix-mid{color:#fbbf24}
   .fix-hard{color:#f87171}
   .fix-none{color:var(--text3)}
-  /* Form/xP line */
-  .player-stats{font-size:7px;color:var(--text3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .player-stats .hot{color:#4ade80}
-  .player-stats .cold{color:#f87171}
-
   /* Bench */
   .bench-divider{height:1px;background:var(--border);margin:8px 0;position:relative}
   .bench-divider::after{
@@ -197,7 +192,6 @@
     .player-badge img{width:24px;height:24px}
     .player-name{font-size:8px}
     .player-fixture{font-size:7px}
-    .player-stats{font-size:6px}
     .manager-bar{flex-direction:column;align-items:flex-start}
     .gw-grid{grid-template-columns:repeat(5,minmax(140px,1fr))}
     .gw-col{min-width:140px}
@@ -422,14 +416,21 @@ function getSquadStats() {
     else if (pl.status === 'd') doubtCount++;
   });
 
-  // Chips used
-  const chipsUsed = historyData?.chips?.map(c => c.name) || [];
+  // Chips: calculate REMAINING from all available minus used
+  const allChips = ['wildcard','wildcard','freehit','bboost','3xc'];
+  const usedChips = (historyData?.chips || []).map(c => c.name);
+  // Remove used from available (handle two wildcards correctly)
+  const remaining = [...allChips];
+  usedChips.forEach(used => {
+    const idx = remaining.indexOf(used);
+    if (idx !== -1) remaining.splice(idx, 1);
+  });
 
   // Bank
   const lastGW = historyData?.current?.slice(-1)[0];
   const bank = lastGW ? lastGW.bank : 0;
 
-  return { totalValue, totalPts, injuredCount, doubtCount, bank, chipsUsed, squadPlayers };
+  return { totalValue, totalPts, injuredCount, doubtCount, bank, chipsRemaining: remaining, squadPlayers };
 }
 
 // ---- Render ----
@@ -469,7 +470,13 @@ function renderAll() {
   const tv = (stats.totalValue / 10).toFixed(1);
   const bk = (stats.bank / 10).toFixed(1);
   let chips = '';
-  if (stats.chipsUsed.length) chips = `<div class="stat-chip">Chips: <b>${stats.chipsUsed.map(c=>c.replace('_',' ')).join(', ')}</b></div>`;
+  const chipNames = {wildcard:'WC',freehit:'FH',bboost:'BB','3xc':'TC'};
+  if (stats.chipsRemaining.length) {
+    const labels = stats.chipsRemaining.map(c => chipNames[c] || c);
+    chips = `<div class="stat-chip">Chips left: <b>${labels.join(', ')}</b></div>`;
+  } else {
+    chips = `<div class="stat-chip">Chips left: <b>None</b></div>`;
+  }
   let flagsHtml = '';
   if (stats.injuredCount) flagsHtml += `<div class="stat-chip"><span class="warn">●</span> ${stats.injuredCount} injured/suspended</div>`;
   if (stats.doubtCount) flagsHtml += `<div class="stat-chip"><span style="color:#f59e0b">●</span> ${stats.doubtCount} doubtful</div>`;
@@ -574,12 +581,6 @@ function renderCard(player, pick, gwFix, teams) {
   else if (player.status === 'd') statusDot = '<div class="status-dot doubt" title="Doubtful"></div>';
   else if (player.status === 's') statusDot = '<div class="status-dot suspended" title="Suspended"></div>';
 
-  // Form + expected points
-  const form = parseFloat(player.form) || 0;
-  const epNext = parseFloat(player.ep_next) || 0;
-  const formCls = form >= 6 ? 'hot' : form <= 2 ? 'cold' : '';
-  const formStr = `<span class="${formCls}">${form.toFixed(1)}</span>`;
-
   // News tooltip
   const newsAttr = player.news ? ` data-news="${esc(player.news)}"` : '';
 
@@ -587,7 +588,6 @@ function renderCard(player, pick, gwFix, teams) {
     <div class="player-badge ${badgeCls}">${inner}${badge}${statusDot}</div>
     <div class="player-name" title="${esc(player.web_name)}">${esc(player.web_name)}</div>
     <div class="player-fixture">${fixHtml}</div>
-    <div class="player-stats">Form ${formStr} · xP ${epNext.toFixed(1)}</div>
   </div>`;
 }
 
