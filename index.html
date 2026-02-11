@@ -347,7 +347,7 @@ async function loadTeam() {
   try {
     // 1. Bootstrap
     if (!bootstrapData) {
-      bootstrapData = await apiFetch(`${API}/api/bootstrap-static/`);
+      bootstrapData = await apiFetch(`${API}/bootstrap-static/`);
     }
 
     // 2. Next GWs
@@ -359,19 +359,19 @@ async function loadTeam() {
     if (nextGWs.length === 0) nextGWs = [startGW];
 
     // 3. Manager info
-    managerData = await apiFetch(`${API}/api/entry/${id}/`);
+    managerData = await apiFetch(`${API}/entry/${id}/`);
 
     // 4. Manager history (for chips used, GW history)
-    historyData = await apiFetch(`${API}/api/entry/${id}/history/`);
+    historyData = await apiFetch(`${API}/entry/${id}/history/`);
 
     // 5. Picks from latest completed GW
     const latestFinished = events.filter(e => e.finished).pop();
     const currentGW = events.find(e => e.is_current);
     const picksGW = latestFinished || currentGW || events[0];
-    picksData = await apiFetch(`${API}/api/entry/${id}/event/${picksGW.id}/picks/`);
+    picksData = await apiFetch(`${API}/entry/${id}/event/${picksGW.id}/picks/`);
 
     // 6. Fixtures
-    bootstrapData._fixtures = await apiFetch(`${API}/api/fixtures/`);
+    bootstrapData._fixtures = await apiFetch(`${API}/fixtures/`);
 
     // 7. Update OG tags dynamically (helps some crawlers)
     updateOGTags();
