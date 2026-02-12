@@ -943,7 +943,7 @@ async function generateShareImage() {
   const topRowCount = Math.min(gwCount, 3);
   const botRowCount = gwCount - topRowCount;
   const W = 1200;
-  const colH = 360;
+  const colH = 430;
   const headerH = 120;
   const rowGap = 20;
   const footerH = 50;
@@ -1009,6 +1009,17 @@ async function generateShareImage() {
     ctx.font = '500 16px DM Sans, sans-serif';
     ctx.fillText(`${m.name}  •  ${m.summary_overall_points} pts  •  Rank ${(m.summary_overall_rank||0).toLocaleString()}`, 40, 96);
 
+    // Expected points in header (right-aligned)
+    const imgStats = getSquadStats();
+    ctx.fillStyle = '#a78bfa';
+    ctx.font = '700 18px DM Sans, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`EP: ${imgStats.startersEP.toFixed(1)}`, W - 40, 72);
+    ctx.fillStyle = '#64748b';
+    ctx.font = '500 11px DM Sans, sans-serif';
+    ctx.fillText('Expected Points (Starting XI)', W - 40, 90);
+    ctx.textAlign = 'start';
+
     // Draw a single player cell
     function drawPlayer(item, px, py, pos) {
       const teamObj = teams.find(t => t.id === item.player.team);
@@ -1047,12 +1058,67 @@ async function generateShareImage() {
         ctx.textAlign = 'center';
         ctx.fillText('V', px + 33, py);
       }
+      // Form dot (bottom-left of badge) — skip if injured/doubtful/suspended
+      const plStatus = item.player.status;
+      const plForm = parseFloat(item.player.form) || 0;
+      if (plStatus !== 'i' && plStatus !== 'd' && plStatus !== 's') {
+        const dotColor = plForm >= 6 ? '#4ade80' : plForm >= 3 ? '#fbbf24' : '#f87171';
+        ctx.fillStyle = dotColor;
+        ctx.beginPath();
+        ctx.arc(px + 12, py + 17, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#111827';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+
       // Name
       ctx.fillStyle = '#ffffff';
       ctx.font = '600 8px DM Sans, sans-serif';
       ctx.textAlign = 'center';
       const displayName = item.player.web_name.length > 8 ? item.player.web_name.substring(0,7)+'…' : item.player.web_name;
       ctx.fillText(displayName, px + 22, py + 28);
+
+      // Ownership badge (DIFF / ESS)
+      const plTsb = parseFloat(item.player.selected_by_percent) || 0;
+      if (plTsb < 10) {
+        // Purple DIFF badge
+        ctx.fillStyle = '#8b5cf640';
+        ctx.beginPath();
+        ctx.roundRect(px + 8, py + 30, 26, 9, 2);
+        ctx.fill();
+        ctx.fillStyle = '#a78bfa';
+        ctx.font = '700 6px DM Sans, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('DIFF', px + 21, py + 37);
+      } else if (plTsb > 50) {
+        // Green ESS badge
+        ctx.fillStyle = '#38ef7d25';
+        ctx.beginPath();
+        ctx.roundRect(px + 10, py + 30, 22, 9, 2);
+        ctx.fill();
+        ctx.fillStyle = '#4ade80';
+        ctx.font = '700 6px DM Sans, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('ESS', px + 21, py + 37);
+      }
+
+      // Form vs PPG indicator
+      const plPpg = parseFloat(item.player.points_per_game) || 0;
+      if (plPpg > 0) {
+        const delta = plForm - plPpg;
+        if (delta >= 1) {
+          ctx.fillStyle = '#4ade80';
+          ctx.font = '700 6px DM Sans, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('▲', px + 22, py + 44);
+        } else if (delta <= -1) {
+          ctx.fillStyle = '#f87171';
+          ctx.font = '700 6px DM Sans, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('▼', px + 22, py + 44);
+        }
+      }
     }
 
     // Draw a single GW column
@@ -1100,7 +1166,7 @@ async function generateShareImage() {
           ctx.fillStyle = diff <= 2 ? '#4ade80' : diff >= 4 ? '#f87171' : '#fbbf24';
           ctx.font = '500 7px DM Sans, sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText(`${opp?.short_name||'???'}${home?'(H)':'(a)'}`, px + 22, py + 37);
+          ctx.fillText(`${opp?.short_name||'???'}${home?'(H)':'(a)'}`, px + 22, py + 51);
         }
       }
 
@@ -1117,7 +1183,7 @@ async function generateShareImage() {
           drawPlayer(item, ppx, py, pos);
           drawFixture(item, ppx, py);
         });
-        py += 45;
+        py += 58;
       });
 
       // Bench separator
