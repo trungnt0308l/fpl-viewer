@@ -679,6 +679,7 @@ function updateCarouselUI() {
   if (!slide) return;
 
   const gap = getTrackGap();
+  const perView = getSlidesPerView();
   const offset = currentSlide * (slide.offsetWidth + gap);
   track.style.transform = `translateX(-${offset}px)`;
 
