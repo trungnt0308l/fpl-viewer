@@ -876,39 +876,25 @@ async function generateShareImage() {
     usedTeamIds.add(f.team_h);
     usedTeamIds.add(f.team_a);
   });
-  // Warm up CORS preflight cache with a single request before parallel fetches
+  // Fetch badge images in small batches to avoid overwhelming R2
   const teamIdArr = [...usedTeamIds];
-  if (teamIdArr.length > 0) {
-    const firstTeam = teams.find(t => t.id === teamIdArr[0]);
-    if (firstTeam) {
-      try {
-        const warmup = await fetch(getTeamLogoURL(firstTeam.code), { mode: 'cors' });
-        const blob = await warmup.blob();
-        const img = new Image();
-        await new Promise(resolve => {
-          img.onload = () => { badgeImages[teamIdArr[0]] = img; resolve(); };
-          img.onerror = () => resolve();
-          img.src = URL.createObjectURL(blob);
-        });
-      } catch (_) { /* preflight warmup failed, parallel fetches will still try */ }
-    }
-  }
-  await Promise.all(teamIdArr.slice(1).map(teamId => {
+  async function loadBadge(teamId) {
     const teamObj = teams.find(t => t.id === teamId);
-    if (!teamObj) return Promise.resolve();
-    const ctrl = new AbortController();
-    const timeout = setTimeout(() => ctrl.abort(), 3000);
-    return fetch(getTeamLogoURL(teamObj.code), { mode: 'cors', signal: ctrl.signal })
-      .then(r => r.blob())
-      .then(blob => new Promise(resolve => {
-        clearTimeout(timeout);
+    if (!teamObj) return;
+    try {
+      const r = await fetch(getTeamLogoURL(teamObj.code), { mode: 'cors' });
+      const blob = await r.blob();
+      await new Promise(resolve => {
         const img = new Image();
         img.onload = () => { badgeImages[teamId] = img; resolve(); };
         img.onerror = () => resolve();
         img.src = URL.createObjectURL(blob);
-      }))
-      .catch(() => { clearTimeout(timeout); });
-  }));
+      });
+    } catch (_) {}
+  }
+  for (let i = 0; i < teamIdArr.length; i += 4) {
+    await Promise.all(teamIdArr.slice(i, i + 4).map(loadBadge));
+  }
 
   let useBadges = Object.keys(badgeImages).length > 0;
 
