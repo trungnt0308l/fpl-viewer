@@ -702,6 +702,24 @@ function getBaseOffset() {
   return currentSlide * (slide.offsetWidth + gap);
 }
 
+function getMaxOffset() {
+  const track = document.getElementById('gwTrack');
+  if (!track) return 0;
+  const slide = track.querySelector('.gw-slide');
+  if (!slide) return 0;
+  const perView = getSlidesPerView();
+  const gap = perView > 1 ? 8 : 0;
+  return getMaxSlide() * (slide.offsetWidth + gap);
+}
+
+function clampDragOffset(rawOffset) {
+  // rawOffset is the proposed translateX value (negative = scrolled right)
+  if (rawOffset > 0) return rawOffset * 0.3;               // rubber-band left edge
+  const max = -getMaxOffset();
+  if (rawOffset < max) return max + (rawOffset - max) * 0.3; // rubber-band right edge
+  return rawOffset;
+}
+
 function setTrackOffset(px) {
   const track = document.getElementById('gwTrack');
   if (track) track.style.transform = `translateX(${px}px)`;
@@ -722,7 +740,7 @@ function initSwipe(el) {
     diffX = e.touches[0].clientX - startX;
     const diffY = e.touches[0].clientY - startY;
     if (Math.abs(diffY) > Math.abs(diffX)) { swiping = false; el.classList.remove('dragging'); return; }
-    setTrackOffset(-getBaseOffset() + diffX);
+    setTrackOffset(clampDragOffset(-getBaseOffset() + diffX));
   }, {passive: true});
   el.addEventListener('touchend', () => {
     el.classList.remove('dragging');
@@ -745,7 +763,7 @@ function initSwipe(el) {
   document.addEventListener('mousemove', e => {
     if (!dragging) return;
     diffX = e.clientX - startX;
-    setTrackOffset(-getBaseOffset() + diffX);
+    setTrackOffset(clampDragOffset(-getBaseOffset() + diffX));
   });
   document.addEventListener('mouseup', () => {
     if (!dragging) return;
