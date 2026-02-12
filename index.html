@@ -876,7 +876,24 @@ async function generateShareImage() {
     usedTeamIds.add(f.team_h);
     usedTeamIds.add(f.team_a);
   });
-  await Promise.all([...usedTeamIds].map(teamId => {
+  // Warm up CORS preflight cache with a single request before parallel fetches
+  const teamIdArr = [...usedTeamIds];
+  if (teamIdArr.length > 0) {
+    const firstTeam = teams.find(t => t.id === teamIdArr[0]);
+    if (firstTeam) {
+      try {
+        const warmup = await fetch(getTeamLogoURL(firstTeam.code), { mode: 'cors' });
+        const blob = await warmup.blob();
+        const img = new Image();
+        await new Promise(resolve => {
+          img.onload = () => { badgeImages[teamIdArr[0]] = img; resolve(); };
+          img.onerror = () => resolve();
+          img.src = URL.createObjectURL(blob);
+        });
+      } catch (_) { /* preflight warmup failed, parallel fetches will still try */ }
+    }
+  }
+  await Promise.all(teamIdArr.slice(1).map(teamId => {
     const teamObj = teams.find(t => t.id === teamId);
     if (!teamObj) return Promise.resolve();
     const ctrl = new AbortController();
