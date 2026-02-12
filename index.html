@@ -710,6 +710,13 @@ function renderAll() {
   totalSlides = nextGWs.length;
   updateCarouselUI();
   initSwipe(carousel);
+
+  // Auto-scroll to manager bar on mobile so content is immediately visible
+  if (window.innerWidth <= 900) {
+    requestAnimationFrame(() => {
+      bar.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
 }
 
 // ---- Carousel logic ----
@@ -949,9 +956,12 @@ async function generateShareImage() {
   const footerH = 50;
   const H = botRowCount > 0 ? headerH + colH + rowGap + colH + footerH : headerH + colH + footerH;
 
+  const scale = Math.min(window.devicePixelRatio || 1, 3);
   const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
+  canvas.width = W * scale; canvas.height = H * scale;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
   const ctx = canvas.getContext('2d');
+  ctx.scale(scale, scale);
 
   // Pre-load team badge images for canvas drawing
   const badgeImages = {};
@@ -1103,7 +1113,7 @@ async function generateShareImage() {
         ctx.fillText('ESS', px + 21, py + 37);
       }
 
-      // Form vs PPG indicator
+      // Form vs PPG indicator (In-form / Off-form)
       const plPpg = parseFloat(item.player.points_per_game) || 0;
       if (plPpg > 0) {
         const delta = plForm - plPpg;
@@ -1111,12 +1121,12 @@ async function generateShareImage() {
           ctx.fillStyle = '#4ade80';
           ctx.font = '700 6px DM Sans, sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText('▲', px + 22, py + 44);
+          ctx.fillText('\u25B2 In-form', px + 22, py + 44);
         } else if (delta <= -1) {
           ctx.fillStyle = '#f87171';
           ctx.font = '700 6px DM Sans, sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText('▼', px + 22, py + 44);
+          ctx.fillText('\u25BC Off-form', px + 22, py + 44);
         }
       }
     }
@@ -1132,6 +1142,8 @@ async function generateShareImage() {
       ctx.fill();
 
       // GW header
+      const gwDl = gw.deadline_time ? new Date(gw.deadline_time) : null;
+      const gwDlStr = gwDl ? gwDl.toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '';
       ctx.fillStyle = '#1a2332';
       ctx.beginPath();
       ctx.roundRect(x, y, cW, 36, [8, 8, 0, 0]);
@@ -1139,7 +1151,12 @@ async function generateShareImage() {
       ctx.fillStyle = '#ffffff';
       ctx.font = '700 14px DM Sans, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`GW${gw.id}`, x + cW/2, y + 24);
+      ctx.fillText(`GW${gw.id}`, x + cW/2, y + (gwDlStr ? 19 : 24));
+      if (gwDlStr) {
+        ctx.fillStyle = '#64748b';
+        ctx.font = '500 9px DM Sans, sans-serif';
+        ctx.fillText(gwDlStr, x + cW/2, y + 31);
+      }
 
       const starters = picks.filter(p => p.position <= 11);
       const bench = picks.filter(p => p.position > 11);
