@@ -225,8 +225,8 @@
   }
 
   @media(max-width:900px){
-    .gw-slide{min-width:100%}
-    .gw-track{gap:0}
+    .gw-slide{min-width:calc(100% - 12px)}
+    .gw-track{gap:12px}
     .carousel-arrow.prev{left:-4px}
     .carousel-arrow.next{right:-4px}
     .carousel-arrow{width:32px;height:32px;font-size:16px}
@@ -666,14 +666,19 @@ function goToSlide(idx) {
   updateCarouselUI();
 }
 
+function getTrackGap() {
+  const track = document.getElementById('gwTrack');
+  if (!track) return 0;
+  return parseFloat(getComputedStyle(track).gap) || 0;
+}
+
 function updateCarouselUI() {
   const track = document.getElementById('gwTrack');
   if (!track) return;
   const slide = track.querySelector('.gw-slide');
   if (!slide) return;
 
-  const perView = getSlidesPerView();
-  const gap = perView > 1 ? 8 : 0;
+  const gap = getTrackGap();
   const offset = currentSlide * (slide.offsetWidth + gap);
   track.style.transform = `translateX(-${offset}px)`;
 
@@ -697,9 +702,7 @@ function getBaseOffset() {
   if (!track) return 0;
   const slide = track.querySelector('.gw-slide');
   if (!slide) return 0;
-  const perView = getSlidesPerView();
-  const gap = perView > 1 ? 8 : 0;
-  return currentSlide * (slide.offsetWidth + gap);
+  return currentSlide * (slide.offsetWidth + getTrackGap());
 }
 
 function getMaxOffset() {
@@ -707,9 +710,7 @@ function getMaxOffset() {
   if (!track) return 0;
   const slide = track.querySelector('.gw-slide');
   if (!slide) return 0;
-  const perView = getSlidesPerView();
-  const gap = perView > 1 ? 8 : 0;
-  return getMaxSlide() * (slide.offsetWidth + gap);
+  return getMaxSlide() * (slide.offsetWidth + getTrackGap());
 }
 
 function clampDragOffset(rawOffset) {
@@ -743,8 +744,9 @@ function initSwipe(el) {
     setTrackOffset(clampDragOffset(-getBaseOffset() + diffX));
   }, {passive: true});
   el.addEventListener('touchend', () => {
+    if (!swiping) { el.classList.remove('dragging'); return; }
     el.classList.remove('dragging');
-    if (!swiping) return;
+    void el.offsetWidth; // force reflow so transition re-enables
     if (diffX > 40) goToSlide(currentSlide - 1);
     else if (diffX < -40) goToSlide(currentSlide + 1);
     else updateCarouselUI();
@@ -769,6 +771,7 @@ function initSwipe(el) {
     if (!dragging) return;
     el.classList.remove('dragging');
     dragging = false;
+    void el.offsetWidth; // force reflow so transition re-enables
     if (diffX > 50) goToSlide(currentSlide - 1);
     else if (diffX < -50) goToSlide(currentSlide + 1);
     else updateCarouselUI();
