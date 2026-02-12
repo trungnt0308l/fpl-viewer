@@ -882,7 +882,7 @@ async function generateShareImage() {
     const teamObj = teams.find(t => t.id === teamId);
     if (!teamObj) return;
     try {
-      const r = await fetch(getTeamLogoURL(teamObj.code), { mode: 'cors' });
+      const r = await fetch(getTeamLogoURL(teamObj.code), { mode: 'cors', cache: 'no-store' });
       const blob = await r.blob();
       await new Promise(resolve => {
         const img = new Image();
