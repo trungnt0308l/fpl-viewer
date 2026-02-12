@@ -16,5 +16,7 @@ done
 
 echo ""
 echo "Done! Badges saved to ./badges/"
-echo "Upload the badges/ folder to your S3 bucket, e.g.:"
-echo "  aws s3 sync badges/ s3://YOUR-BUCKET/badges/ --acl public-read"
+echo "Upload to your R2 bucket:"
+echo "  npx wrangler r2 object put fpl-viewer/badges/t\${code}.png --file badges/t\${code}.png"
+echo "Or bulk upload:"
+echo "  for f in badges/*.png; do npx wrangler r2 object put \"fpl-viewer/\$f\" --file \"\$f\"; done"
