@@ -255,24 +255,19 @@ let picksData = {};
 let nextGWs = [];
 let historyData = null;
 
-// ---- Logo cache ----
+// ---- Logo URLs — loaded directly from PL CDN (no proxy needed for <img> tags) ----
 const logoCache = {};
-async function getTeamLogoURL(teamCode) {
-  if (logoCache[teamCode]) return logoCache[teamCode];
-  const src = `https://resources.premierleague.com/premierleague/badges/t${teamCode}.png`;
-  try {
-    const res = await fetch(PROXIES[proxyIndex](src), { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) throw new Error();
-    const blob = await res.blob();
-    logoCache[teamCode] = URL.createObjectURL(blob);
-  } catch {
-    logoCache[teamCode] = src;
+function getTeamLogoURL(teamCode) {
+  if (!logoCache[teamCode]) {
+    logoCache[teamCode] = `https://resources.premierleague.com/premierleague/badges/t${teamCode}.png`;
   }
   return logoCache[teamCode];
 }
-async function prefetchLogos() {
+function prefetchLogos() {
+  // Direct URLs don't need prefetching, but populate the cache
+  // so renderCard finds entries immediately
   if (!bootstrapData) return;
-  await Promise.allSettled(bootstrapData.teams.map(t => getTeamLogoURL(t.code)));
+  bootstrapData.teams.forEach(t => getTeamLogoURL(t.code));
 }
 
 // ---- Fetch ----
@@ -359,7 +354,6 @@ async function loadTeam() {
     historyData = await apiFetch(`${API}/entry/${id}/history/`);
 
     // 5. Picks — prefer current GW (has active captain/team selection)
-    //    then fall back to latest finished
     const currentGW = events.find(e => e.is_current);
     const latestFinished = events.filter(e => e.finished).pop();
     const picksGW = currentGW || latestFinished || events[0];
@@ -371,9 +365,9 @@ async function loadTeam() {
     // 7. Update OG tags dynamically (helps some crawlers)
     updateOGTags();
 
-    // 8. Render, then swap logos
+    // 8. Populate logo cache and render
+    prefetchLogos();
     renderAll();
-    prefetchLogos().then(() => renderAll());
 
   } catch(err) {
     showError(`Failed to load team. ${err.message}. Check your FPL ID and try again.`);
@@ -417,7 +411,7 @@ function getSquadStats() {
     else if (pl.status === 'd') doubtCount++;
   });
 
-  // Chips: each manager starts with 2 WC, 2 FH, 2 BB, 2 TC
+  // Chips: each manager starts with 2 WC, 2 FH, 2 BB, 2 TC — deduct used
   const allChips = ['wildcard','wildcard','freehit','freehit','bboost','bboost','3xc','3xc'];
   const usedChips = (historyData?.chips || []).map(c => c.name);
   const remaining = [...allChips];
