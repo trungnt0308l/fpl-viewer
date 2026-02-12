@@ -91,6 +91,7 @@
     position:relative;touch-action:pan-y;cursor:grab
   }
   .gw-carousel.dragging{cursor:grabbing;user-select:none}
+  .gw-carousel.dragging .gw-track{transition:none}
   .gw-track{
     display:flex;gap:8px;transition:transform .35s cubic-bezier(.4,0,.2,1);
     will-change:transform
@@ -691,6 +692,21 @@ function updateCarouselUI() {
   if (next) next.disabled = currentSlide >= getMaxSlide();
 }
 
+function getBaseOffset() {
+  const track = document.getElementById('gwTrack');
+  if (!track) return 0;
+  const slide = track.querySelector('.gw-slide');
+  if (!slide) return 0;
+  const perView = getSlidesPerView();
+  const gap = perView > 1 ? 8 : 0;
+  return currentSlide * (slide.offsetWidth + gap);
+}
+
+function setTrackOffset(px) {
+  const track = document.getElementById('gwTrack');
+  if (track) track.style.transform = `translateX(${px}px)`;
+}
+
 function initSwipe(el) {
   let startX = 0, startY = 0, diffX = 0, swiping = false;
 
@@ -699,17 +715,21 @@ function initSwipe(el) {
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     swiping = true;
+    el.classList.add('dragging');
   }, {passive: true});
   el.addEventListener('touchmove', e => {
     if (!swiping) return;
     diffX = e.touches[0].clientX - startX;
     const diffY = e.touches[0].clientY - startY;
-    if (Math.abs(diffY) > Math.abs(diffX)) { swiping = false; return; }
+    if (Math.abs(diffY) > Math.abs(diffX)) { swiping = false; el.classList.remove('dragging'); return; }
+    setTrackOffset(-getBaseOffset() + diffX);
   }, {passive: true});
   el.addEventListener('touchend', () => {
+    el.classList.remove('dragging');
     if (!swiping) return;
     if (diffX > 40) goToSlide(currentSlide - 1);
     else if (diffX < -40) goToSlide(currentSlide + 1);
+    else updateCarouselUI();
     swiping = false; diffX = 0;
   }, {passive: true});
 
@@ -720,10 +740,12 @@ function initSwipe(el) {
     diffX = 0;
     dragging = true;
     el.classList.add('dragging');
+    e.preventDefault();
   });
   document.addEventListener('mousemove', e => {
     if (!dragging) return;
     diffX = e.clientX - startX;
+    setTrackOffset(-getBaseOffset() + diffX);
   });
   document.addEventListener('mouseup', () => {
     if (!dragging) return;
@@ -731,6 +753,7 @@ function initSwipe(el) {
     dragging = false;
     if (diffX > 50) goToSlide(currentSlide - 1);
     else if (diffX < -50) goToSlide(currentSlide + 1);
+    else updateCarouselUI();
     diffX = 0;
   });
 
