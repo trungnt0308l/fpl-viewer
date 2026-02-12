@@ -711,12 +711,10 @@ function renderAll() {
   updateCarouselUI();
   initSwipe(carousel);
 
-  // Auto-scroll to manager bar on mobile so content is immediately visible
-  if (window.innerWidth <= 900) {
-    requestAnimationFrame(() => {
-      bar.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  }
+  // Auto-scroll to manager bar so content is immediately visible
+  requestAnimationFrame(() => {
+    bar.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 }
 
 // ---- Carousel logic ----
