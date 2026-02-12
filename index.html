@@ -307,11 +307,12 @@ let picksData = {};
 let nextGWs = [];
 let historyData = null;
 
-// ---- Logo URLs — loaded directly from PL CDN (no proxy needed for <img> tags) ----
+// ---- Logo URLs — self-hosted on R2 for CORS support ----
+const BADGE_CDN = 'https://pub-9618cf27a5ef43f6acbd0099b778414b.r2.dev';
 const logoCache = {};
 function getTeamLogoURL(teamCode) {
   if (!logoCache[teamCode]) {
-    logoCache[teamCode] = `https://resources.premierleague.com/premierleague/badges/t${teamCode}.png`;
+    logoCache[teamCode] = `${BADGE_CDN}/badges/t${teamCode}.png`;
   }
   return logoCache[teamCode];
 }
@@ -880,9 +881,6 @@ async function generateShareImage() {
     if (!teamObj) return Promise.resolve();
     return new Promise(resolve => {
       const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => { badgeImages[teamId] = img; resolve(); };
-      img.onerror = () => resolve();
       const timeout = setTimeout(() => { img.src = ''; resolve(); }, 3000);
       img.onload = () => { clearTimeout(timeout); badgeImages[teamId] = img; resolve(); };
       img.onerror = () => { clearTimeout(timeout); resolve(); };
@@ -890,7 +888,6 @@ async function generateShareImage() {
     });
   }));
 
-  // Check if we need to skip badges (CORS / tainted canvas)
   let useBadges = Object.keys(badgeImages).length > 0;
 
   const posMap = {1:'GKP',2:'DEF',3:'MID',4:'FWD'};
@@ -1097,14 +1094,6 @@ async function generateShareImage() {
 
   // Draw everything
   drawAll();
-
-  // If canvas is tainted by CORS images, redraw without badges
-  try {
-    ctx.getImageData(0, 0, 1, 1);
-  } catch(e) {
-    useBadges = false;
-    drawAll();
-  }
 
   // Download / share
   canvas.toBlob(blob => {
