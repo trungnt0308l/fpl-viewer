@@ -849,105 +849,161 @@ async function generateShareImage() {
   const teams = bootstrapData.teams;
   const fixtures = bootstrapData._fixtures || [];
 
-  const W = 1200, H = 630; // OG image standard size
+  const gwCount = Math.min(nextGWs.length, 5);
+  const topRowCount = Math.min(gwCount, 3);
+  const botRowCount = gwCount - topRowCount;
+  const W = 1200;
+  const colH = 360;
+  const headerH = 120;
+  const rowGap = 20;
+  const footerH = 50;
+  const H = botRowCount > 0 ? headerH + colH + rowGap + colH + footerH : headerH + colH + footerH;
+
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
 
-  // Background
-  ctx.fillStyle = '#0a0e17';
-  ctx.fillRect(0, 0, W, H);
-
-  // Header gradient bar
-  const grad = ctx.createLinearGradient(0, 0, W, 0);
-  grad.addColorStop(0, '#11998e');
-  grad.addColorStop(1, '#38ef7d');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, W, 4);
-
-  // Title
-  ctx.fillStyle = '#38ef7d';
-  ctx.font = '600 14px DM Sans, sans-serif';
-  ctx.fillText('⚽ FPL VIEWER', 40, 40);
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '700 24px DM Sans, sans-serif';
-  ctx.fillText(`${m.player_first_name} ${m.player_last_name}`, 40, 72);
-  ctx.fillStyle = '#94a3b8';
-  ctx.font = '500 16px DM Sans, sans-serif';
-  ctx.fillText(`${m.name}  •  ${m.summary_overall_points} pts  •  Rank ${(m.summary_overall_rank||0).toLocaleString()}`, 40, 96);
-
-  // Columns
-  const colW = (W - 80 - 40) / Math.min(nextGWs.length, 5);
-  const startX = 40;
-  const startY = 130;
-
-  nextGWs.slice(0, 5).forEach((gw, gi) => {
-    const x = startX + gi * (colW + 10);
-
-    // Column bg
-    ctx.fillStyle = '#111827';
-    ctx.beginPath();
-    ctx.roundRect(x, startY, colW, H - startY - 30, 8);
-    ctx.fill();
-
-    // GW header
-    ctx.fillStyle = '#1a2332';
-    ctx.beginPath();
-    ctx.roundRect(x, startY, colW, 36, [8, 8, 0, 0]);
-    ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '700 14px DM Sans, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(`GW${gw.id}`, x + colW/2, startY + 24);
-
-    // Players
-    const gwFix = fixtures.filter(f => f.event === gw.id);
-    const starters = picks.filter(p => p.position <= 11);
-    let py = startY + 50;
-    const posMap = {1:'GKP',2:'DEF',3:'MID',4:'FWD'};
-    const posOrder = ['GKP','DEF','MID','FWD'];
-    const grouped = {};
-    posOrder.forEach(p => grouped[p] = []);
-    starters.forEach(pick => {
-      const pl = players.find(p => p.id === pick.element);
-      if (pl) grouped[posMap[pl.element_type]||'MID'].push({pick,player:pl});
+  // Pre-load team badge images for canvas drawing
+  const badgeImages = {};
+  const usedTeamIds = new Set();
+  picks.forEach(pick => {
+    const pl = players.find(p => p.id === pick.element);
+    if (pl) usedTeamIds.add(pl.team);
+  });
+  const gwIds = nextGWs.slice(0, 5).map(gw => gw.id);
+  fixtures.filter(f => gwIds.includes(f.event)).forEach(f => {
+    usedTeamIds.add(f.team_h);
+    usedTeamIds.add(f.team_a);
+  });
+  await Promise.all([...usedTeamIds].map(teamId => {
+    const teamObj = teams.find(t => t.id === teamId);
+    if (!teamObj) return Promise.resolve();
+    return new Promise(resolve => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => { badgeImages[teamId] = img; resolve(); };
+      img.onerror = () => resolve();
+      const timeout = setTimeout(() => { img.src = ''; resolve(); }, 3000);
+      img.onload = () => { clearTimeout(timeout); badgeImages[teamId] = img; resolve(); };
+      img.onerror = () => { clearTimeout(timeout); resolve(); };
+      img.src = getTeamLogoURL(teamObj.code);
     });
+  }));
 
-    const posColors = {GKP:'#f59e0b',DEF:'#3b82f6',MID:'#22c55e',FWD:'#ef4444'};
+  // Check if we need to skip badges (CORS / tainted canvas)
+  let useBadges = Object.keys(badgeImages).length > 0;
 
-    posOrder.forEach(pos => {
-      const group = grouped[pos];
-      const rowW = group.length * 46;
-      const rowX = x + (colW - rowW) / 2;
-      group.forEach((item, pi) => {
-        const px = rowX + pi * 46;
+  const posMap = {1:'GKP',2:'DEF',3:'MID',4:'FWD'};
+  const posOrder = ['GKP','DEF','MID','FWD'];
+  const posColors = {GKP:'#f59e0b',DEF:'#3b82f6',MID:'#22c55e',FWD:'#ef4444'};
+  const cellW = 46;
 
-        // Small colored dot
+  function drawAll() {
+    // Background
+    ctx.fillStyle = '#0a0e17';
+    ctx.fillRect(0, 0, W, H);
+
+    // Header gradient bar
+    const grad = ctx.createLinearGradient(0, 0, W, 0);
+    grad.addColorStop(0, '#11998e');
+    grad.addColorStop(1, '#38ef7d');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, 4);
+
+    // Title
+    ctx.fillStyle = '#38ef7d';
+    ctx.font = '600 14px DM Sans, sans-serif';
+    ctx.textAlign = 'start';
+    ctx.fillText('⚽ FPL VIEWER', 40, 40);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 24px DM Sans, sans-serif';
+    ctx.fillText(`${m.player_first_name} ${m.player_last_name}`, 40, 72);
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '500 16px DM Sans, sans-serif';
+    ctx.fillText(`${m.name}  •  ${m.summary_overall_points} pts  •  Rank ${(m.summary_overall_rank||0).toLocaleString()}`, 40, 96);
+
+    // Draw a single player cell
+    function drawPlayer(item, px, py, pos) {
+      const teamObj = teams.find(t => t.id === item.player.team);
+      // Badge or fallback
+      if (useBadges && badgeImages[item.player.team]) {
+        ctx.drawImage(badgeImages[item.player.team], px + 11, py - 2, 22, 22);
+      } else {
         ctx.fillStyle = posColors[pos];
         ctx.beginPath();
-        ctx.arc(px + 23, py + 6, 5, 0, Math.PI * 2);
+        ctx.arc(px + 22, py + 8, 10, 0, Math.PI * 2);
         ctx.fill();
-
-        // Captain indicator
-        if (item.pick.is_captain) {
-          ctx.fillStyle = '#fbbf24';
-          ctx.beginPath();
-          ctx.arc(px + 30, py + 1, 4, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = '#0a0e17';
-          ctx.font = '700 5px DM Sans, sans-serif';
+        if (teamObj) {
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '700 7px DM Sans, sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText('C', px + 30, py + 3);
+          ctx.fillText(teamObj.short_name, px + 22, py + 11);
         }
-
-        // Name
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '600 8px DM Sans, sans-serif';
+      }
+      // Captain / vice-captain indicator
+      if (item.pick.is_captain) {
+        ctx.fillStyle = '#fbbf24';
+        ctx.beginPath();
+        ctx.arc(px + 33, py - 2, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#0a0e17';
+        ctx.font = '700 6px DM Sans, sans-serif';
         ctx.textAlign = 'center';
-        const displayName = item.player.web_name.length > 8 ? item.player.web_name.substring(0,7)+'…' : item.player.web_name;
-        ctx.fillText(displayName, px + 23, py + 20);
+        ctx.fillText('C', px + 33, py);
+      } else if (item.pick.is_vice_captain) {
+        ctx.fillStyle = '#94a3b8';
+        ctx.beginPath();
+        ctx.arc(px + 33, py - 2, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#0a0e17';
+        ctx.font = '700 6px DM Sans, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('V', px + 33, py);
+      }
+      // Name
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '600 8px DM Sans, sans-serif';
+      ctx.textAlign = 'center';
+      const displayName = item.player.web_name.length > 8 ? item.player.web_name.substring(0,7)+'…' : item.player.web_name;
+      ctx.fillText(displayName, px + 22, py + 28);
+    }
 
-        // Fixture
+    // Draw a single GW column
+    function drawGWColumn(gw, x, y, cW) {
+      const gwFix = fixtures.filter(f => f.event === gw.id);
+
+      // Column bg
+      ctx.fillStyle = '#111827';
+      ctx.beginPath();
+      ctx.roundRect(x, y, cW, colH, 8);
+      ctx.fill();
+
+      // GW header
+      ctx.fillStyle = '#1a2332';
+      ctx.beginPath();
+      ctx.roundRect(x, y, cW, 36, [8, 8, 0, 0]);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '700 14px DM Sans, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`GW${gw.id}`, x + cW/2, y + 24);
+
+      const starters = picks.filter(p => p.position <= 11);
+      const bench = picks.filter(p => p.position > 11);
+
+      // Group starters by position
+      function groupByPos(list) {
+        const g = {};
+        posOrder.forEach(p => g[p] = []);
+        list.forEach(pick => {
+          const pl = players.find(p => p.id === pick.element);
+          if (pl) g[posMap[pl.element_type]||'MID'].push({pick,player:pl});
+        });
+        return g;
+      }
+
+      // Draw fixture text below a player
+      function drawFixture(item, px, py) {
         const pf = gwFix.filter(f => f.team_h === item.player.team || f.team_a === item.player.team);
         if (pf.length) {
           const f = pf[0];
@@ -956,22 +1012,101 @@ async function generateShareImage() {
           const diff = home ? f.team_h_difficulty : f.team_a_difficulty;
           ctx.fillStyle = diff <= 2 ? '#4ade80' : diff >= 4 ? '#f87171' : '#fbbf24';
           ctx.font = '500 7px DM Sans, sans-serif';
-          ctx.fillText(`${opp?.short_name||'???'}${home?'(H)':'(a)'}`, px + 23, py + 29);
+          ctx.textAlign = 'center';
+          ctx.fillText(`${opp?.short_name||'???'}${home?'(H)':'(a)'}`, px + 22, py + 37);
+        }
+      }
+
+      // Starters
+      let py = y + 48;
+      const starterGroups = groupByPos(starters);
+      posOrder.forEach(pos => {
+        const group = starterGroups[pos];
+        if (group.length === 0) return;
+        const rowW = group.length * cellW;
+        const rowX = x + (cW - rowW) / 2;
+        group.forEach((item, pi) => {
+          const ppx = rowX + pi * cellW;
+          drawPlayer(item, ppx, py, pos);
+          drawFixture(item, ppx, py);
+        });
+        py += 45;
+      });
+
+      // Bench separator
+      py += 2;
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(x + 15, py);
+      ctx.lineTo(x + cW - 15, py);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      py += 8;
+
+      // Bench label
+      ctx.fillStyle = '#64748b';
+      ctx.font = '500 8px DM Sans, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('BENCH', x + cW/2, py + 4);
+      py += 12;
+
+      // Bench players in a single row
+      const benchRowW = bench.length * cellW;
+      const benchRowX = x + (cW - benchRowW) / 2;
+      bench.forEach((pick, i) => {
+        const pl = players.find(p => p.id === pick.element);
+        if (pl) {
+          const pos = posMap[pl.element_type] || 'MID';
+          const ppx = benchRowX + i * cellW;
+          drawPlayer({pick, player: pl}, ppx, py, pos);
+          drawFixture({pick, player: pl}, ppx, py);
         }
       });
-      py += 38;
+    }
+
+    // Layout: top row
+    const margin = 40;
+    const colGap = 12;
+    const topColW = (W - 2 * margin - (topRowCount - 1) * colGap) / topRowCount;
+    const startY = headerH;
+
+    nextGWs.slice(0, topRowCount).forEach((gw, i) => {
+      drawGWColumn(gw, margin + i * (topColW + colGap), startY, topColW);
     });
-  });
 
-  // Watermark
-  ctx.fillStyle = '#64748b';
-  ctx.font = '500 12px DM Sans, sans-serif';
-  ctx.textAlign = 'right';
-  ctx.fillText(window.location.origin + '?id=' + managerData.id, W - 40, H - 16);
+    // Layout: bottom row (centered)
+    if (botRowCount > 0) {
+      const botColW = topColW;
+      const botTotalW = botRowCount * botColW + (botRowCount - 1) * colGap;
+      const botStartX = (W - botTotalW) / 2;
+      const botStartY = startY + colH + rowGap;
+      nextGWs.slice(topRowCount, topRowCount + botRowCount).forEach((gw, i) => {
+        drawGWColumn(gw, botStartX + i * (botColW + colGap), botStartY, botColW);
+      });
+    }
 
-  ctx.textAlign = 'start'; // reset
+    // Watermark
+    ctx.fillStyle = '#64748b';
+    ctx.font = '500 12px DM Sans, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(window.location.origin + '?id=' + managerData.id, W - 40, H - 16);
+    ctx.textAlign = 'start';
+  }
 
-  // Download
+  // Draw everything
+  drawAll();
+
+  // If canvas is tainted by CORS images, redraw without badges
+  try {
+    ctx.getImageData(0, 0, 1, 1);
+  } catch(e) {
+    useBadges = false;
+    drawAll();
+  }
+
+  // Download / share
   canvas.toBlob(blob => {
     const url = URL.createObjectURL(blob);
     // Try native share with image on mobile
