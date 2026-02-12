@@ -802,7 +802,7 @@ function renderCard(player, pick, gwFix, teams) {
 
   const cached = logoCache[teamCode];
   const inner = cached
-    ? `<img src="${cached}" alt="${esc(teamShort)}" loading="lazy">`
+    ? `<img src="${cached}" crossorigin="anonymous" alt="${esc(teamShort)}" loading="lazy">`
     : `<span class="fallback-text">${esc(teamShort)}</span>`;
   const badgeCls = cached ? '' : posClass;
 
@@ -876,25 +876,18 @@ async function generateShareImage() {
     usedTeamIds.add(f.team_h);
     usedTeamIds.add(f.team_a);
   });
-  // Fetch badge images in small batches to avoid overwhelming R2
-  const teamIdArr = [...usedTeamIds];
-  async function loadBadge(teamId) {
-    const teamObj = teams.find(t => t.id === teamId);
-    if (!teamObj) return;
-    try {
-      const r = await fetch(getTeamLogoURL(teamObj.code), { mode: 'cors', cache: 'no-store' });
-      const blob = await r.blob();
-      await new Promise(resolve => {
-        const img = new Image();
-        img.onload = () => { badgeImages[teamId] = img; resolve(); };
-        img.onerror = () => resolve();
-        img.src = URL.createObjectURL(blob);
-      });
-    } catch (_) {}
-  }
-  for (let i = 0; i < teamIdArr.length; i += 4) {
-    await Promise.all(teamIdArr.slice(i, i + 4).map(loadBadge));
-  }
+  // Reuse badge images already loaded in the DOM (with crossorigin="anonymous")
+  document.querySelectorAll('.player-badge img[crossorigin]').forEach(img => {
+    if (!img.complete || !img.naturalWidth) return;
+    // Find the team ID from the src URL
+    const match = img.src.match(/\/t(\d+)\.png/);
+    if (!match) return;
+    const code = Number(match[1]);
+    const teamObj = teams.find(t => t.code === code);
+    if (teamObj && usedTeamIds.has(teamObj.id)) {
+      badgeImages[teamObj.id] = img;
+    }
+  });
 
   let useBadges = Object.keys(badgeImages).length > 0;
 
