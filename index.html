@@ -291,6 +291,13 @@
   /* EP chip accent */
   .stat-chip .ep{color:#a78bfa;font-weight:600}
 
+  /* GW header EP display */
+  .gw-header .gw-ep{font-size:11px;color:#a78bfa;font-weight:600;margin-top:2px}
+
+  /* Manager bar rank chart background */
+  .manager-bar{position:relative;overflow:hidden}
+  .rank-bg-chart{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;opacity:0.12}
+
   @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
   .fade-in{animation:fadeIn .4s ease both}
   .delay-1{animation-delay:.05s}.delay-2{animation-delay:.1s}
@@ -527,6 +534,58 @@ function getSquadStats() {
   return { totalValue, totalPts, injuredCount, doubtCount, bank, chipsRemaining: remaining, squadPlayers, startersEP };
 }
 
+// ---- Compute EP for a specific gameweek ----
+function computeGWExpectedPoints(gw, picks, players, fixtures) {
+  const isNext = nextGWs.length > 0 && gw.id === nextGWs[0].id;
+  const gwFix = fixtures.filter(f => f.event === gw.id);
+  let total = 0;
+  picks.forEach(pick => {
+    if (pick.position > 11) return;
+    const pl = players.find(p => p.id === pick.element);
+    if (!pl) return;
+    let ep = 0;
+    if (isNext) {
+      ep = parseFloat(pl.ep_next) || 0;
+    } else {
+      const ppg = parseFloat(pl.points_per_game) || 0;
+      const pf = gwFix.filter(f => f.team_h === pl.team || f.team_a === pl.team);
+      pf.forEach(f => {
+        const diff = f.team_h === pl.team ? f.team_h_difficulty : f.team_a_difficulty;
+        ep += ppg * (6 - diff) / 3;
+      });
+    }
+    total += pick.is_captain ? ep * 2 : ep;
+  });
+  return total;
+}
+
+// ---- Rank progression helpers ----
+function getRankProgression() {
+  if (!historyData?.current?.length) return [];
+  return historyData.current.slice(-5).map(gw => ({ gw: gw.event, rank: gw.overall_rank }));
+}
+
+function renderRankBgSVG(data) {
+  if (data.length < 2) return '';
+  const ranks = data.map(d => d.rank);
+  const minR = Math.min(...ranks);
+  const maxR = Math.max(...ranks);
+  const range = maxR - minR || 1;
+  const pad = 0.1;
+  // Points in 0-100 x 0-100 viewBox; invert Y so lower rank = higher
+  const pts = data.map((d, i) => ({
+    x: (i / (data.length - 1)) * 100,
+    y: pad * 100 + ((d.rank - minR) / range) * (1 - 2 * pad) * 100
+  }));
+  const lineD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const areaD = lineD + ` L100,100 L0,100 Z`;
+  // Color based on trend
+  const improving = ranks[ranks.length - 1] < ranks[0];
+  const worsening = ranks[ranks.length - 1] > ranks[0];
+  const color = improving ? '#4ade80' : worsening ? '#f87171' : '#38ef7d';
+  return `<svg class="rank-bg-chart" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><path d="${areaD}" fill="${color}"/><path d="${lineD}" fill="none" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
+}
+
 // ---- Render ----
 function renderAll() {
   const el = document.getElementById('content');
@@ -556,6 +615,10 @@ function renderAll() {
         Share
       </button>
     </div>`;
+  const rankData = getRankProgression();
+  if (rankData.length >= 2) {
+    bar.innerHTML += renderRankBgSVG(rankData);
+  }
   el.appendChild(bar);
 
   // Stats bar
@@ -636,7 +699,8 @@ function renderAll() {
     slide.className = 'gw-slide';
     const dl = gw.deadline_time ? new Date(gw.deadline_time) : null;
     const dlStr = dl ? dl.toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '';
-    slide.innerHTML = `<div class="gw-header"><div class="gw-num">GW${gw.id}</div><div class="gw-deadline">${dlStr}</div></div>`;
+    const gwEP = computeGWExpectedPoints(gw, picks, players, fixtures);
+    slide.innerHTML = `<div class="gw-header"><div class="gw-num">GW${gw.id}</div><div class="gw-deadline">${dlStr}</div><div class="gw-ep">EP: ${gwEP.toFixed(1)}</div></div>`;
 
     const body = document.createElement('div');
     body.className = 'gw-body';
