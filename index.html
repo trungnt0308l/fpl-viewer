@@ -296,7 +296,7 @@
 
   /* Manager bar rank chart background */
   .manager-bar{position:relative;overflow:hidden}
-  .rank-bg-chart{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;opacity:0.12}
+  .rank-bg-chart{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;opacity:0.18}
 
   @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
   .fade-in{animation:fadeIn .4s ease both}
@@ -571,19 +571,41 @@ function renderRankBgSVG(data) {
   const minR = Math.min(...ranks);
   const maxR = Math.max(...ranks);
   const range = maxR - minR || 1;
-  const pad = 0.1;
-  // Points in 0-100 x 0-100 viewBox; invert Y so lower rank = higher
+  const baseY = 55; // baseline slightly below center
+  const amp = 35;   // max spike amplitude from baseline
+  // Map each data point to an X position and spike Y (inverted: lower rank = higher spike)
   const pts = data.map((d, i) => ({
-    x: (i / (data.length - 1)) * 100,
-    y: pad * 100 + ((d.rank - minR) / range) * (1 - 2 * pad) * 100
+    x: 5 + (i / (data.length - 1)) * 90,
+    peakY: baseY - ((maxR - d.rank) / range) * amp // better rank = higher spike (lower Y)
   }));
-  const lineD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-  const areaD = lineD + ` L100,100 L0,100 Z`;
+  // Build heartbeat/ECG path: flat baseline → sharp spike at each data point
+  let pathD = `M0,${baseY}`;
+  pts.forEach((p, i) => {
+    const preFlat = i === 0 ? 0 : (pts[i-1].x + p.x) / 2;
+    // Flat approach to spike
+    pathD += ` L${(preFlat + p.x * 2) / 3},${baseY}`;
+    // Small pre-dip
+    pathD += ` L${p.x - 2},${baseY + 4}`;
+    // Sharp spike UP to peak
+    pathD += ` L${p.x},${p.peakY}`;
+    // Sharp spike DOWN (overshoot below baseline)
+    const overshoot = baseY + (baseY - p.peakY) * 0.3;
+    pathD += ` L${p.x + 2},${Math.min(overshoot, baseY + 12)}`;
+    // Return to baseline
+    pathD += ` L${p.x + 4},${baseY}`;
+  });
+  pathD += ` L100,${baseY}`;
+  // Area fill under the line
+  const areaD = pathD + ` L100,100 L0,100 Z`;
   // Color based on trend
   const improving = ranks[ranks.length - 1] < ranks[0];
   const worsening = ranks[ranks.length - 1] > ranks[0];
   const color = improving ? '#4ade80' : worsening ? '#f87171' : '#38ef7d';
-  return `<svg class="rank-bg-chart" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><path d="${areaD}" fill="${color}"/><path d="${lineD}" fill="none" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
+  // Data point dots
+  const dots = pts.map(p =>
+    `<circle cx="${p.x}" cy="${p.peakY}" r="3" fill="${color}" fill-opacity="0.7" stroke="${color}" stroke-width="1" vector-effect="non-scaling-stroke"/>`
+  ).join('');
+  return `<svg class="rank-bg-chart" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><path d="${areaD}" fill="${color}" fill-opacity="0.3"/><path d="${pathD}" fill="none" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke"/>${dots}</svg>`;
 }
 
 // ---- Render ----
