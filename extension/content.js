@@ -191,7 +191,7 @@
 
       if (isOwnTeam) {
         try {
-          picksData = await apiFetch(`${API}/my-team/`);
+          picksData = await apiFetch(`${API}/my-team/${managerId}/`);
         } catch(e) {
           // Fallback — e.g. if session expired mid-request
           const currentGW = events.find(e => e.is_current);
