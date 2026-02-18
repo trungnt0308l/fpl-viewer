@@ -345,7 +345,7 @@
       });
 
       // Bench
-      html += '<div class="fpl-bench-divider">BENCH</div>';
+      html += '<div class="fpl-bench-divider"></div>';
       html += '<div class="fpl-bench-section">';
       bench.forEach(pick => {
         const pl = players.find(p => p.id === pick.element);
