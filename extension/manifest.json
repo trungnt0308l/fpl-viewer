@@ -14,7 +14,8 @@
       "matches": ["https://fantasy.premierleague.com/*"],
       "js": ["content.js"],
       "css": ["sidebar.css"],
-      "run_at": "document_end"
+      "run_at": "document_end",
+      "world": "MAIN"
     }
   ],
   "icons": {
