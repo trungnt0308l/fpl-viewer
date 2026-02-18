@@ -15,6 +15,7 @@
   let nextGWs = [];
   let historyData = null;
   let sidebarOpen = false;
+  let myFplId = null; // logged-in user's FPL ID (from /api/me/)
 
   // Badge CDN
   const BADGE_CDN = 'https://pub-9618cf27a5ef43f6acbd0099b778414b.r2.dev';
@@ -123,12 +124,29 @@
     sidebarOpen = false;
   }
 
+  // Try to get the logged-in user's FPL ID via /api/me/ (requires session cookie)
+  async function fetchMyFplId() {
+    if (myFplId) return myFplId;
+    try {
+      const me = await apiFetch(`${API}/me/`);
+      myFplId = me.player ? String(me.player.entry) : null;
+      return myFplId;
+    } catch(e) {
+      // Not logged in or endpoint failed — that's fine, we just can't use /my-team/
+      return null;
+    }
+  }
+
   // Load team data
   async function loadTeamData() {
     const contentEl = document.getElementById('fpl-sidebar-content');
 
     try {
-      const managerId = getManagerIdFromPage();
+      // Resolve manager ID: URL first, then logged-in user via /api/me/
+      let managerId = getManagerIdFromPage();
+      if (!managerId) {
+        managerId = await fetchMyFplId();
+      }
       if (!managerId) {
         contentEl.innerHTML = `
           <div class="fpl-error">
@@ -165,11 +183,28 @@
       // 4. Manager history
       historyData = await apiFetch(`${API}/entry/${managerId}/history/`);
 
-      // 5. Picks
-      const currentGW = events.find(e => e.is_current);
-      const latestFinished = events.filter(e => e.finished).pop();
-      const picksGW = currentGW || latestFinished || events[0];
-      picksData = await apiFetch(`${API}/entry/${managerId}/event/${picksGW.id}/picks/`);
+      // 5. Picks — use /api/my-team/ for the logged-in user's own team
+      //    (returns the latest squad including pending transfers),
+      //    otherwise fall back to the event picks endpoint.
+      const loggedInId = await fetchMyFplId();
+      const isOwnTeam = loggedInId && loggedInId === String(managerId);
+
+      if (isOwnTeam) {
+        try {
+          picksData = await apiFetch(`${API}/my-team/`);
+        } catch(e) {
+          // Fallback — e.g. if session expired mid-request
+          const currentGW = events.find(e => e.is_current);
+          const latestFinished = events.filter(e => e.finished).pop();
+          const picksGW = currentGW || latestFinished || events[0];
+          picksData = await apiFetch(`${API}/entry/${managerId}/event/${picksGW.id}/picks/`);
+        }
+      } else {
+        const currentGW = events.find(e => e.is_current);
+        const latestFinished = events.filter(e => e.finished).pop();
+        const picksGW = currentGW || latestFinished || events[0];
+        picksData = await apiFetch(`${API}/entry/${managerId}/event/${picksGW.id}/picks/`);
+      }
 
       // 6. Fixtures
       bootstrapData._fixtures = await apiFetch(`${API}/fixtures/`);
