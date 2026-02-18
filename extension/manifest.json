@@ -7,8 +7,7 @@
     "storage"
   ],
   "host_permissions": [
-    "https://fantasy.premierleague.com/*",
-    "https://fpl-proxy.tuantrung.workers.dev/*"
+    "https://fantasy.premierleague.com/*"
   ],
   "content_scripts": [
     {
