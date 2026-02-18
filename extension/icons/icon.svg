@@ -1,0 +1,22 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#11998e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#38ef7d;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="url(#grad)"/>
+
+  <!-- Football/Soccer ball icon -->
+  <circle cx="64" cy="64" r="35" fill="white" stroke="#0a0e17" stroke-width="2"/>
+
+  <!-- Pentagon pattern -->
+  <path d="M 64 29 L 54 45 L 64 50 L 74 45 Z" fill="#0a0e17"/>
+  <path d="M 54 45 L 39 50 L 44 65 L 59 65 L 64 50 Z" fill="none" stroke="#0a0e17" stroke-width="2"/>
+  <path d="M 74 45 L 89 50 L 84 65 L 69 65 L 64 50 Z" fill="none" stroke="#0a0e17" stroke-width="2"/>
+  <path d="M 44 65 L 44 80 L 59 85 L 64 70 Z" fill="none" stroke="#0a0e17" stroke-width="2"/>
+  <path d="M 84 65 L 84 80 L 69 85 L 64 70 Z" fill="none" stroke="#0a0e17" stroke-width="2"/>
+  <path d="M 59 85 L 64 99 L 69 85 L 64 70 Z" fill="#0a0e17"/>
+</svg>

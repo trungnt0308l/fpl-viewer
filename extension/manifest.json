@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "FPL Squad Preview",
+  "version": "1.0.0",
+  "description": "Preview your FPL squad for the next 5 gameweeks while making transfers",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://fantasy.premierleague.com/*",
+    "https://fpl-proxy.tuantrung.workers.dev/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://fantasy.premierleague.com/*"],
+      "js": ["content.js"],
+      "css": ["sidebar.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
