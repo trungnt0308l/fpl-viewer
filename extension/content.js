@@ -6,7 +6,7 @@
 
   // Config — call the FPL API directly; the content script runs inside
   // fantasy.premierleague.com so all requests are same-origin (no CORS issue).
-  const API = 'https://fantasy.premierleague.com';
+  const API = 'https://fantasy.premierleague.com/api';
 
   // State
   let bootstrapData = null;
