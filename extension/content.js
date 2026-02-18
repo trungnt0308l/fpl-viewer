@@ -4,15 +4,9 @@
 (function() {
   'use strict';
 
-  // Config
+  // Config — call the FPL API directly; the content script runs inside
+  // fantasy.premierleague.com so all requests are same-origin (no CORS issue).
   const API = 'https://fantasy.premierleague.com';
-  const PROXIES = [
-    url => {
-      const path = new URL(url).pathname;
-      return `https://fpl-proxy.tuantrung.workers.dev${path}`;
-    },
-  ];
-  let proxyIndex = 0;
 
   // State
   let bootstrapData = null;
@@ -33,20 +27,11 @@
     return logoCache[teamCode];
   }
 
-  // Fetch helper
+  // Fetch helper — direct same-origin request (no proxy needed in an extension)
   async function apiFetch(url) {
-    let lastErr;
-    for (let i = 0; i < PROXIES.length; i++) {
-      const idx = (proxyIndex + i) % PROXIES.length;
-      try {
-        const res = await fetch(PROXIES[idx](url), { signal: AbortSignal.timeout(12000) });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        proxyIndex = idx;
-        return data;
-      } catch(e) { lastErr = e; }
-    }
-    throw new Error(`All proxies failed. Last: ${lastErr?.message}`);
+    const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
   }
 
   // Get manager ID from FPL website
