@@ -312,10 +312,43 @@
   margin-bottom: 4px;
 }
 
+.fpl-gw-ep-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
 .fpl-gw-ep {
   font-size: 12px;
   color: #a78bfa;
   font-weight: 600;
+}
+
+.fpl-best-team-toggle {
+  background: var(--fpl-surface3);
+  border: 1px solid var(--fpl-border);
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--fpl-text2);
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.fpl-best-team-toggle:hover {
+  border-color: var(--fpl-accent);
+  color: var(--fpl-text);
+}
+
+.fpl-best-team-toggle.active {
+  background: var(--fpl-accent);
+  border-color: var(--fpl-accent);
+  color: #0a0e17;
 }
 
 /* Squad */

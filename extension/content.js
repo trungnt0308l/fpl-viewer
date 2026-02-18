@@ -16,6 +16,8 @@
   let historyData = null;
   let sidebarOpen = false;
   let myFplId = null; // logged-in user's FPL ID (from /api/me/)
+  let bestTeamState = {}; // gwIndex -> boolean
+  let bestTeamCache = {}; // gwIndex -> computed best team data
 
   // Badge CDN
   const BADGE_CDN = 'https://pub-9618cf27a5ef43f6acbd0099b778414b.r2.dev';
@@ -270,6 +272,171 @@
     return total;
   }
 
+  // EP for one player in a specific GW
+  function computePlayerGWEP(player, gw, gwFix) {
+    const isNext = nextGWs.length > 0 && gw.id === nextGWs[0].id;
+    if (isNext) return parseFloat(player.ep_next) || 0;
+    const ppg = parseFloat(player.points_per_game) || 0;
+    let ep = 0;
+    gwFix.filter(f => f.team_h === player.team || f.team_a === player.team).forEach(f => {
+      const diff = f.team_h === player.team ? f.team_h_difficulty : f.team_a_difficulty;
+      ep += ppg * (6 - diff) / 3;
+    });
+    return ep;
+  }
+
+  // Select the best valid XI from the 15-man squad for a given GW.
+  // Valid FPL formation: 1 GKP, 3-5 DEF, 2-5 MID, 1-3 FWD (total 11).
+  // Captain is assigned to the highest-EP starter (doubles their EP).
+  function computeBestTeam(picks, players, gw, gwFix) {
+    const posMap = {1:'GKP', 2:'DEF', 3:'MID', 4:'FWD'};
+    const byPos = {GKP:[], DEF:[], MID:[], FWD:[]};
+
+    picks.forEach(pick => {
+      const pl = players.find(p => p.id === pick.element);
+      if (!pl) return;
+      const pos = posMap[pl.element_type] || 'MID';
+      const ep = computePlayerGWEP(pl, gw, gwFix);
+      byPos[pos].push({pick: {...pick, is_captain: false, is_vice_captain: false}, player: pl, ep});
+    });
+
+    // Sort each position pool by EP descending so slice(0,N) gives the best N
+    Object.keys(byPos).forEach(pos => byPos[pos].sort((a, b) => b.ep - a.ep));
+
+    // All valid DEF-MID-FWD distributions (must sum to 10, DEF 3-5, FWD 1-3)
+    const formations = [
+      [3,5,2],[3,4,3],[4,5,1],[4,4,2],[4,3,3],[5,4,1],[5,3,2],[5,2,3]
+    ];
+
+    let bestEP = -Infinity;
+    let bestResult = null;
+
+    formations.forEach(([d, m, f]) => {
+      if (!byPos.GKP.length || byPos.DEF.length < d || byPos.MID.length < m || byPos.FWD.length < f) return;
+
+      const starters = [
+        byPos.GKP[0],
+        ...byPos.DEF.slice(0, d),
+        ...byPos.MID.slice(0, m),
+        ...byPos.FWD.slice(0, f),
+      ];
+
+      // Captain = highest EP starter, VC = second highest
+      const sorted = [...starters].sort((a, b) => b.ep - a.ep);
+      const captainEl = sorted[0];
+      const vcEl = sorted[1] || null;
+
+      const totalEP = starters.reduce((sum, p) =>
+        sum + (p === captainEl ? p.ep * 2 : p.ep), 0);
+
+      if (totalEP > bestEP) {
+        bestEP = totalEP;
+
+        const starterIds = new Set(starters.map(s => s.pick.element));
+        const bench = [
+          ...byPos.GKP.filter(p => !starterIds.has(p.pick.element)),
+          ...byPos.DEF.filter(p => !starterIds.has(p.pick.element)),
+          ...byPos.MID.filter(p => !starterIds.has(p.pick.element)),
+          ...byPos.FWD.filter(p => !starterIds.has(p.pick.element)),
+        ].sort((a, b) => b.ep - a.ep);
+
+        const badge = item => ({
+          ...item,
+          pick: {
+            ...item.pick,
+            is_captain: item === captainEl,
+            is_vice_captain: item === vcEl,
+          }
+        });
+
+        bestResult = {
+          starterGroups: {
+            GKP: [badge(byPos.GKP[0])],
+            DEF: byPos.DEF.slice(0, d).map(badge),
+            MID: byPos.MID.slice(0, m).map(badge),
+            FWD: byPos.FWD.slice(0, f).map(badge),
+          },
+          bench: bench.map(b => ({...b, pick: {...b.pick, is_captain: false, is_vice_captain: false}})),
+          totalEP,
+        };
+      }
+    });
+
+    return bestResult;
+  }
+
+  // Package the actual picks into the same {starterGroups, bench} shape used by buildSquadHTML
+  function getActualSquadData(picks, players) {
+    const posMap = {1:'GKP', 2:'DEF', 3:'MID', 4:'FWD'};
+    const starterGroups = {GKP:[], DEF:[], MID:[], FWD:[]};
+    const bench = [];
+
+    picks.forEach(pick => {
+      const player = players.find(p => p.id === pick.element);
+      if (!player) return;
+      if (pick.position <= 11) {
+        const pos = posMap[player.element_type] || 'MID';
+        starterGroups[pos].push({pick, player});
+      } else {
+        bench.push({pick, player});
+      }
+    });
+
+    return {starterGroups, bench};
+  }
+
+  // Build the inner HTML of the squad container (pos rows + bench divider + bench row)
+  function buildSquadHTML(starterGroups, bench, gwFix, teams) {
+    const posOrder = ['GKP','DEF','MID','FWD'];
+    let html = '';
+    posOrder.forEach(pos => {
+      const group = starterGroups[pos] || [];
+      if (!group.length) return;
+      html += '<div class="fpl-pos-section">';
+      group.forEach(({pick, player}) => { html += renderPlayerCard(player, pick, gwFix, teams); });
+      html += '</div>';
+    });
+    html += '<div class="fpl-bench-divider"></div>';
+    html += '<div class="fpl-bench-section">';
+    bench.forEach(({pick, player}) => { html += renderPlayerCard(player, pick, gwFix, teams); });
+    html += '</div>';
+    return html;
+  }
+
+  // Toggle best-team mode for a GW slide
+  function toggleBestTeam(gwIndex) {
+    bestTeamState[gwIndex] = !bestTeamState[gwIndex];
+    const gw = nextGWs[gwIndex];
+    const fixtures = bootstrapData._fixtures || [];
+    const gwFix = fixtures.filter(f => f.event === gw.id);
+    const picks = picksData.picks || [];
+    const players = bootstrapData.elements;
+    const teams = bootstrapData.teams;
+
+    const btn = document.querySelector(`.fpl-best-team-toggle[data-gw="${gwIndex}"]`);
+    const squadEl = document.getElementById(`fpl-squad-gw-${gwIndex}`);
+    const epEl = document.getElementById(`fpl-gw-ep-${gwIndex}`);
+
+    let squadData;
+    if (bestTeamState[gwIndex]) {
+      if (!bestTeamCache[gwIndex]) {
+        bestTeamCache[gwIndex] = computeBestTeam(picks, players, gw, gwFix);
+      }
+      squadData = bestTeamCache[gwIndex];
+      if (btn) btn.classList.add('active');
+      if (epEl && squadData) epEl.textContent = `Best XI: ${squadData.totalEP.toFixed(1)} pts`;
+    } else {
+      squadData = getActualSquadData(picks, players);
+      const actualEP = computeGWExpectedPoints(gw, picks, players, fixtures);
+      if (btn) btn.classList.remove('active');
+      if (epEl) epEl.textContent = `Expected: ${actualEP.toFixed(1)} pts`;
+    }
+
+    if (squadEl && squadData) {
+      squadEl.innerHTML = buildSquadHTML(squadData.starterGroups, squadData.bench, gwFix, teams);
+    }
+  }
+
   // Render preview
   function renderPreview() {
     const contentEl = document.getElementById('fpl-sidebar-content');
@@ -277,6 +444,10 @@
     const players = bootstrapData.elements;
     const teams = bootstrapData.teams;
     const fixtures = bootstrapData._fixtures || [];
+
+    // Reset per-render state
+    bestTeamState = {};
+    bestTeamCache = {};
 
     let html = '';
 
@@ -317,41 +488,17 @@
         <div class="fpl-gw-info">
           <div class="fpl-gw-title">Gameweek ${gw.id}</div>
           <div class="fpl-gw-deadline">${dlStr}</div>
-          <div class="fpl-gw-ep">Expected: ${gwEP.toFixed(1)} pts</div>
+          <div class="fpl-gw-ep-row">
+            <div class="fpl-gw-ep" id="fpl-gw-ep-${gwIndex}">Expected: ${gwEP.toFixed(1)} pts</div>
+            <button class="fpl-best-team-toggle" data-gw="${gwIndex}" title="Show best possible XI by expected points">Best XI</button>
+          </div>
         </div>
       `;
 
       // Squad
-      const starters = picks.filter(p => p.position <= 11);
-      const bench = picks.filter(p => p.position > 11);
-
-      const posMap = {1:'GKP',2:'DEF',3:'MID',4:'FWD'};
-      const posOrder = ['GKP','DEF','MID','FWD'];
-      const grouped = {};
-      posOrder.forEach(p => grouped[p] = []);
-      starters.forEach(pick => {
-        const pl = players.find(p => p.id === pick.element);
-        if (pl) grouped[posMap[pl.element_type]||'MID'].push({pick,player:pl});
-      });
-
-      html += '<div class="fpl-squad">';
-      posOrder.forEach(pos => {
-        if (grouped[pos].length === 0) return;
-        html += `<div class="fpl-pos-section">`;
-        grouped[pos].forEach(({pick,player}) => {
-          html += renderPlayerCard(player, pick, gwFix, teams);
-        });
-        html += '</div>';
-      });
-
-      // Bench
-      html += '<div class="fpl-bench-divider">BENCH</div>';
-      html += '<div class="fpl-bench-section">';
-      bench.forEach(pick => {
-        const pl = players.find(p => p.id === pick.element);
-        if (pl) html += renderPlayerCard(pl, pick, gwFix, teams);
-      });
-      html += '</div>';
+      const actualSquad = getActualSquadData(picks, players);
+      html += `<div class="fpl-squad" id="fpl-squad-gw-${gwIndex}">`;
+      html += buildSquadHTML(actualSquad.starterGroups, actualSquad.bench, gwFix, teams);
       html += '</div>'; // end squad
 
       html += '</div>'; // end slide
@@ -367,6 +514,11 @@
         const gwIndex = parseInt(tab.dataset.gw);
         switchToGW(gwIndex);
       });
+    });
+
+    // Add Best XI toggle handlers
+    document.querySelectorAll('.fpl-best-team-toggle').forEach(btn => {
+      btn.addEventListener('click', () => toggleBestTeam(parseInt(btn.dataset.gw)));
     });
   }
 
