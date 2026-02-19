@@ -333,12 +333,14 @@
         bestEP = totalEP;
 
         const starterIds = new Set(starters.map(s => s.pick.element));
-        const bench = [
-          ...byPos.GKP.filter(p => !starterIds.has(p.pick.element)),
+        // FPL bench order: outfield subs sorted by EP, then backup GK last
+        const benchOutfield = [
           ...byPos.DEF.filter(p => !starterIds.has(p.pick.element)),
           ...byPos.MID.filter(p => !starterIds.has(p.pick.element)),
           ...byPos.FWD.filter(p => !starterIds.has(p.pick.element)),
         ].sort((a, b) => b.ep - a.ep);
+        const benchGK = byPos.GKP.filter(p => !starterIds.has(p.pick.element));
+        const bench = [...benchOutfield, ...benchGK];
 
         const badge = item => ({
           ...item,
